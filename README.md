@@ -1,0 +1,270 @@
+# prediction-trading
+
+Automated **stock trading + AI-powered prediction** system.
+
+This project merges two upstream repositories into one end-to-end pipeline:
+
+| Source                                                                                             | Contribution                                                                                         |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`edwinlau67/stock-prediction`](https://github.com/edwinlau67/stock-prediction)                    | Claude (Anthropic) tool-use predictor, rich `predictions.md` + dynamic multi-panel analysis chart, six indicator categories, fundamental scoring. |
+| [`edwinlau67/automated-trading-systems`](https://github.com/edwinlau67/automated-trading-systems) | Multi-timeframe weighted scoring, portfolio / position / trade primitives, ATR-based risk manager, bar-by-bar backtester, performance reports. |
+
+Every feature from `stock-prediction`'s README — including the CLI, the
+six `--indicators` categories, the dynamic chart panels (confidence arc
+gauge, MACD, RSI, Stochastic, Volume+Spikes, OBV, Support/Resistance,
+ATR, Fundamental grid), the `predictions.md` layout, and the
+`results/YYYYMMDD_HHMMSS/` output folder — is present.
+
+## Project structure
+
+```
+prediction-trading/
+├── stock_predictor.py                  # CLI mirroring stock-prediction (primary predictor)
+├── config/default.yaml                 # portfolio, risk, signal, and AI defaults
+├── DESIGN.md                           # architecture and scoring model
+├── src/
+│   ├── system.py                       # PredictionTradingSystem (backtester façade)
+│   ├── data_fetcher.py                 # yfinance wrapper (OHLCV + fundamentals)
+│   ├── indicators/
+│   │   ├── technical.py                # SMA, EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV
+│   │   └── levels.py                   # pivots, Fibonacci, swing trendlines
+│   ├── prediction/
+│   │   ├── factor.py                   # Factor model + IndicatorCategory enum
+│   │   ├── signal_scorer.py            # point-based scorer with category filtering
+│   │   ├── ai_predictor.py             # Claude tool-use predictor (offline fallback)
+│   │   └── predictor.py                # UnifiedPredictor — fuses rules + AI
+│   ├── trading/
+│   │   ├── portfolio.py                # Portfolio / Position / Trade
+│   │   └── risk_manager.py             # sizing + stops + R:R + daily loss cap
+│   ├── backtest/backtester.py          # bar-by-bar engine
+│   ├── reporting/
+│   │   ├── prediction_chart.py         # dynamic multi-panel analysis chart
+│   │   ├── prediction_report.py        # predictions.md writer
+│   │   ├── charts.py                   # 4-chart backtest dashboard
+│   │   └── report.py                   # backtest report.md
+│   └── logger.py
+├── examples/                           # backtest + multi-ticker examples
+└── tests/                              # 22 unit + integration tests
+```
+
+## Quick start
+
+```bash
+git clone <this-repo> prediction-trading
+cd prediction-trading
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Optional — enable the Claude-powered predictor
+cp .env.example .env
+# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## CLI — `stock_predictor.py`
+
+The CLI is a drop-in equivalent of `stock-prediction`'s `stock_predictor.py`.
+
+### Run with defaults
+
+```bash
+python stock_predictor.py
+# → AAPL (1w), TSLA (1w), INTC (1w) with all six indicator categories
+```
+
+### Specify tickers and timeframe
+
+```bash
+python stock_predictor.py --tickers NVDA
+python stock_predictor.py --tickers MSFT --timeframe 3m
+python stock_predictor.py --tickers GOOG AMZN --timeframe 1d
+python stock_predictor.py --tickers AAPL --model claude-opus-4-7
+```
+
+### Select indicator categories
+
+Omitting a category removes it from both the scoring engine and the chart panels.
+
+```bash
+# Trend + momentum only
+python stock_predictor.py --tickers AAPL --indicators trend momentum
+
+# Volatility + volume only
+python stock_predictor.py --tickers TSLA --indicators volatility volume
+
+# Fundamentals only
+python stock_predictor.py --tickers MSFT --indicators fundamental
+
+# Single category
+python stock_predictor.py --tickers NVDA --indicators support
+```
+
+### Full option list
+
+```
+usage: stock_predictor.py [-h] [--tickers TICKER [TICKER ...]]
+                          [--timeframe {1d,1w,1m,3m,6m,ytd,1y,2y,5y}]
+                          [--model MODEL]
+                          [--indicators INDICATOR [INDICATOR ...]]
+                          [--no-ai] [--out OUT]
+
+  --tickers     One or more stock ticker symbols (default: AAPL TSLA INTC)
+  --timeframe   Prediction timeframe: 1d 1w 1m 3m 6m ytd 1y 2y 5y (default: 1w)
+  --model       Claude model ID (default: claude-sonnet-4-6)
+  --indicators  Indicator categories (default: all six)
+                Choices: trend momentum volatility volume support fundamental
+  --no-ai       Skip the Claude call; rule-based-only run.
+  --out         Output root directory (default: results/)
+```
+
+### Supported timeframes and models
+
+| Timeframe | Meaning      |
+| --------- | ------------ |
+| 1d        | 1 day        |
+| 1w        | 1 week       |
+| 1m        | 1 month      |
+| 3m        | 3 months     |
+| 6m        | 6 months     |
+| ytd       | Year to date |
+| 1y        | 1 year       |
+| 2y        | 2 years      |
+| 5y        | 5 years      |
+
+| Model ID                    | Notes                             |
+| --------------------------- | --------------------------------- |
+| `claude-sonnet-4-6`         | Default — fast and cost-effective |
+| `claude-opus-4-7`           | Most capable, higher cost         |
+| `claude-haiku-4-5-20251001` | Fastest and cheapest              |
+
+## Output
+
+**Predictions and backtests both land in the same `results/` root**, each
+in its own self-describing, timestamped subfolder:
+
+```
+results/
+├── predict_20260422_074503/            ← stock_predictor.py output
+│   ├── predictions.md                  # multi-ticker markdown with embedded charts
+│   └── charts/
+│       ├── AAPL_1w.png
+│       ├── TSLA_1m.png
+│       └── INTC_1m.png
+│
+└── backtest_AAPL_20260422_075022/      ← PredictionTradingSystem.save_report output
+    ├── report.md                       # backtest stats + prediction + trade log
+    └── charts/
+        ├── indicators.png
+        ├── signals.png
+        ├── performance.png
+        └── risk.png
+```
+
+The `predict_` / `backtest_` prefix is applied automatically so runs from
+both pipelines remain cleanly separated while sharing a single root.
+
+### `predictions.md` — sections per ticker
+
+| Section                                 | Content                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------- |
+| 📊 Prediction Summary                   | Direction, confidence, current price, price target + %, target date, risk level, net score |
+| Embedded chart                          | Inline PNG with every selected panel                                               |
+| 🟢 Key Bullish Factors                  | Up to 8 bullish factors with scoring detail (`+N pts`)                             |
+| 🔴 Key Risk Factors / Bearish Signals   | Up to 8 bearish factors                                                            |
+| 📐 Technical Levels to Watch            | Pivot points — R2, R1, PP, S1, S2                                                  |
+| 📏 Fibonacci Retracement Levels         | 0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100% of 6-month range                         |
+| 📝 Analysis                             | Claude narrative (or deterministic summary when AI disabled)                       |
+
+### Analysis chart panels
+
+Three panels are always rendered:
+
+1. **Price + Target** — 6-month close with projected target and (selectable) MA / Bollinger overlays.
+2. **Confidence & Risk** — arc gauge showing confidence %, coloured direction pill, ATR-derived risk pill.
+3. **Technical Signal Factors** — horizontal bar chart of the top scored factors (green = bullish, red = bearish).
+
+Optional panels (present only when the matching `--indicators` category is selected):
+
+| Panel                    | Category     |
+| ------------------------ | ------------ |
+| MACD (12, 26, 9)         | `trend`      |
+| RSI (14)                 | `momentum`   |
+| Stochastic (14, 3)       | `momentum`   |
+| Volume + Spikes          | `volume`     |
+| OBV                      | `volume`     |
+| Support & Resistance     | `support`    |
+| ATR (14)                 | `volatility` |
+| Fundamental Indicators   | `fundamental` (15-metric colour-coded grid) |
+
+## Technical indicators
+
+All computed from Yahoo Finance OHLCV (1-year daily) + fundamentals snapshot.
+
+### `trend`
+SMA50, SMA200, EMA12/20/26, MACD (12/26/9), Golden Cross, Death Cross, MACD crossover, price vs SMA checks.
+
+### `momentum`
+RSI (14): oversold <30 / midline 50 / overbought >70.
+Stochastic (14, 3): %K/%D crossover, oversold <20 / overbought >80.
+
+### `volatility`
+Bollinger Bands (20, 2σ), ATR (14) — ATR > 1.3× 20-day mean → high risk; < 0.8× → low risk.
+
+### `volume`
+OBV (trend), Volume Spike (>20-day mean + 2σ).
+
+### `fundamental`
+P/E (TTM), Forward P/E, P/B, P/S, EV/EBITDA, PEG, Revenue Growth, EPS Growth, Net Margin, Operating Margin, ROE, Debt/Equity, Current Ratio, Dividend Yield, Short Ratio.
+
+### `support`
+Trendlines (5-bar swing detection), Pivot Points (R2/R1/PP/S1/S2), Fibonacci Retracement (0%–100% over 6-month range).
+
+Direction and confidence come from scoring — no random guessing. See
+[`DESIGN.md`](DESIGN.md) for the full point table.
+
+## Backtester
+
+The same prediction engine powers an automated backtester built on
+`Portfolio` + `RiskManager`:
+
+```python
+from src import PredictionTradingSystem
+
+system = PredictionTradingSystem(
+    ticker="AAPL", initial_capital=10_000, enable_ai=True,
+)
+result = system.backtest("2023-01-01", "2024-01-01")
+prediction = system.predict()
+system.save_report(result=result, prediction=prediction)
+```
+
+This produces a `results/backtest_AAPL_<timestamp>/` folder with:
+
+| File                     | Contents                                       |
+| ------------------------ | ---------------------------------------------- |
+| `report.md`              | Backtest stats + trade log + prediction        |
+| `charts/indicators.png`  | Price, MAs, Bollinger, MACD, RSI, ADX          |
+| `charts/signals.png`     | Close with buy/sell markers per trade          |
+| `charts/performance.png` | Equity curve + drawdown                        |
+| `charts/risk.png`        | Per-trade P&L and ATR                          |
+
+## Prompt caching
+
+The Claude system prompt carries `cache_control: {type: "ephemeral"}`.
+On repeated calls within a 5-minute window, Anthropic serves the cached
+prefix at ~10% of input token cost (same mechanism as `stock-prediction`).
+
+## Running tests
+
+```bash
+pytest tests/ -v
+# 22 passed
+```
+
+All tests use synthetic OHLCV fixtures, so they run offline and without
+an API key.
+
+## Disclaimer
+
+For educational and research purposes only. Predictions are derived from
+technical and fundamental signals, but past performance does not guarantee
+future results.
