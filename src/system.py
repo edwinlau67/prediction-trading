@@ -26,7 +26,10 @@ from .indicators import TechnicalIndicators
 from .logger import get_logger
 from .prediction import AIPredictor, Prediction, SignalScorer, UnifiedPredictor
 from .reporting import ChartBuilder, ReportWriter
-from .trading import Portfolio, RiskManager
+from .trading import (
+    AutoTrader, BaseBroker, MarketHours, PaperBroker, Portfolio, RiskManager,
+    StateStore,
+)
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "default.yaml"
@@ -40,6 +43,7 @@ class _Config:
     indicators: dict[str, Any]
     ai: dict[str, Any]
     data: dict[str, Any]
+    trader: dict[str, Any]
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> "_Config":
@@ -52,6 +56,7 @@ class _Config:
             indicators=data.get("indicators", {}),
             ai=data.get("ai", {}),
             data=data.get("data", {}),
+            trader=data.get("trader", {}),
         )
 
 
@@ -185,6 +190,72 @@ class PredictionTradingSystem:
         )
         self.logger.info("Report written: %s", report)
         return out_dir
+
+    # ------------------------------------------------------------- live
+    def build_auto_trader(
+        self,
+        tickers: list[str] | tuple[str, ...] | None = None,
+        *,
+        broker: BaseBroker | None = None,
+        portfolio: Portfolio | None = None,
+        state_path: str | Path | None = None,
+        trade_log_path: str | Path | None = None,
+        dry_run: bool = False,
+        enforce_market_hours: bool | None = None,
+        log_dir: str | Path | None = None,
+        lookback_days: int | None = None,
+    ) -> AutoTrader:
+        """Assemble an :class:`AutoTrader` using this system's predictor + risk manager.
+
+        Defaults come from the ``trader`` section of ``default.yaml`` but can
+        be overridden here. If ``broker`` is omitted a :class:`PaperBroker`
+        is created against ``portfolio`` (restored from ``state_path`` when
+        present).
+        """
+        trader_cfg = getattr(self.cfg, "trader", None) or {}
+        if not isinstance(trader_cfg, dict):
+            trader_cfg = {}
+
+        symbols = list(tickers) if tickers else [self.ticker]
+
+        capital = self.cfg.portfolio.get("initial_capital", 10_000.0)
+        commission = self.cfg.portfolio.get("commission_per_trade", 1.0)
+
+        store: StateStore | None = None
+        if state_path is not None:
+            store = StateStore(state_path)
+            if portfolio is None:
+                portfolio = store.load_or_create(
+                    initial_capital=capital, commission_per_trade=commission,
+                )
+        if portfolio is None:
+            portfolio = Portfolio(
+                initial_capital=capital, commission_per_trade=commission,
+            )
+
+        if broker is None:
+            broker = PaperBroker(
+                portfolio,
+                slippage_bps=float(trader_cfg.get("slippage_bps", 0.0)),
+            )
+
+        enforce = trader_cfg.get("enforce_market_hours", False) \
+            if enforce_market_hours is None else enforce_market_hours
+
+        return AutoTrader(
+            tickers=symbols,
+            predictor=self.predictor,
+            risk=self.risk,
+            broker=broker,
+            portfolio=portfolio,
+            data_fetcher=self.data_fetcher,
+            lookback_days=lookback_days or self.cfg.data.get("lookback_days", 365),
+            state_store=store,
+            trade_log=trade_log_path,
+            log_dir=log_dir,
+            market_hours=MarketHours() if enforce else None,
+            dry_run=dry_run,
+        )
 
     # ----------------------------------------------------------- internals
     @staticmethod

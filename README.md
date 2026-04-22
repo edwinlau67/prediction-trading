@@ -20,10 +20,11 @@ ATR, Fundamental grid), the `predictions.md` layout, and the
 ```
 prediction-trading/
 ├── stock_predictor.py                  # CLI mirroring stock-prediction (primary predictor)
-├── config/default.yaml                 # portfolio, risk, signal, and AI defaults
+├── automated_trader.py                 # CLI for the live / paper trading engine
+├── config/default.yaml                 # portfolio, risk, signal, trader, AI defaults
 ├── DESIGN.md                           # architecture and scoring model
 ├── src/
-│   ├── system.py                       # PredictionTradingSystem (backtester façade)
+│   ├── system.py                       # PredictionTradingSystem (predict / backtest / build_auto_trader)
 │   ├── data_fetcher.py                 # yfinance wrapper (OHLCV + fundamentals)
 │   ├── indicators/
 │   │   ├── technical.py                # SMA, EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV
@@ -35,7 +36,10 @@ prediction-trading/
 │   │   └── predictor.py                # UnifiedPredictor — fuses rules + AI
 │   ├── trading/
 │   │   ├── portfolio.py                # Portfolio / Position / Trade
-│   │   └── risk_manager.py             # sizing + stops + R:R + daily loss cap
+│   │   ├── risk_manager.py             # sizing + stops + R:R + daily loss cap
+│   │   ├── broker.py                   # BaseBroker, PaperBroker, RecordingBroker
+│   │   ├── state.py                    # JSON portfolio persistence (stop/resume)
+│   │   └── auto_trader.py              # AutoTrader — live/paper loop runner
 │   ├── backtest/backtester.py          # bar-by-bar engine
 │   ├── reporting/
 │   │   ├── prediction_chart.py         # dynamic multi-panel analysis chart
@@ -43,8 +47,8 @@ prediction-trading/
 │   │   ├── charts.py                   # 4-chart backtest dashboard
 │   │   └── report.py                   # backtest report.md
 │   └── logger.py
-├── examples/                           # backtest + multi-ticker examples
-└── tests/                              # 22 unit + integration tests
+├── examples/                           # predict + backtest + live-trading examples
+└── tests/                              # 32 unit + integration tests
 ```
 
 ## Quick start
@@ -247,6 +251,86 @@ This produces a `results/backtest_AAPL_<timestamp>/` folder with:
 | `charts/performance.png` | Equity curve + drawdown                        |
 | `charts/risk.png`        | Per-trade P&L and ATR                          |
 
+## Automated trading
+
+`automated_trader.py` runs the same prediction + risk engine on a live
+schedule. Orders are routed through a pluggable broker — the default
+`PaperBroker` simulates fills against the latest yfinance quote, and any
+real broker (Alpaca, IBKR, Binance, …) plugs in by implementing
+`BaseBroker` (`get_quote`, `place_order`, `close_position`).
+
+### CLI
+
+```bash
+# Single dry-run cycle (no orders submitted), emit signals only
+python automated_trader.py --tickers AAPL TSLA --dry-run --once
+
+# Paper-trade every 5 minutes (unlimited), persist portfolio state
+python automated_trader.py --tickers AAPL MSFT NVDA --interval 300
+
+# Claude-fused predictions + enforce US equities market hours
+ANTHROPIC_API_KEY=sk-ant-... python automated_trader.py \
+    --tickers AAPL --ai --market-hours --cycles 12 --interval 300
+```
+
+Each cycle, for every ticker, the engine:
+
+1. Refreshes OHLCV + indicators, closes any position that hits its stop
+   or take-profit.
+2. Marks the portfolio to the latest quote.
+3. Asks `UnifiedPredictor` for a signal and offers it to `RiskManager`
+   (position sizing, R:R, daily loss cap, concurrency limit).
+4. Submits an approved order through the broker, records the fill in
+   `trades.csv`, and snapshots the portfolio to `portfolio_state.json`
+   so a fresh start resumes exactly where it left off.
+
+### Output folder
+
+```
+results/live_20260422_081000/
+├── portfolio_state.json      # resumable snapshot (cash, positions, trades, equity curve)
+├── trades.csv                # every open / close action logged with ts, price, qty, pnl, reason
+└── prediction_trading.log    # structured cycle log
+```
+
+### Python API
+
+```python
+from src import PredictionTradingSystem
+
+system = PredictionTradingSystem(
+    ticker="AAPL", initial_capital=25_000, enable_ai=True,
+)
+trader = system.build_auto_trader(
+    tickers=["AAPL", "MSFT", "NVDA"],
+    state_path="results/live/portfolio_state.json",
+    trade_log_path="results/live/trades.csv",
+    dry_run=False,
+    enforce_market_hours=True,
+)
+# one-shot cycle
+report = trader.run_once()
+print(report.opened, report.closed, report.equity)
+
+# continuous loop — every 5 min, up to 24 cycles
+trader.run(interval_seconds=300, max_cycles=24)
+```
+
+### Config (`config/default.yaml`)
+
+```yaml
+trader:
+  interval_seconds: 300        # seconds between cycles
+  enforce_market_hours: false  # only trade 09:30–16:00 ET, Mon–Fri
+  slippage_bps: 0.0            # paper-broker slippage model (basis points)
+  dry_run: false               # signals only, never place orders
+```
+
+All portfolio sizing, stop / take-profit ATR multiples, min R:R, daily
+loss cap, and min confidence still come from the existing `portfolio:`
+/ `risk:` / `signals:` sections, so backtest parameters and live
+parameters stay in lockstep.
+
 ## Prompt caching
 
 The Claude system prompt carries `cache_control: {type: "ephemeral"}`.
@@ -257,7 +341,7 @@ prefix at ~10% of input token cost (same mechanism as `stock-prediction`).
 
 ```bash
 pytest tests/ -v
-# 22 passed
+# 32 passed
 ```
 
 All tests use synthetic OHLCV fixtures, so they run offline and without

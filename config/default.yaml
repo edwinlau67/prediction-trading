@@ -43,3 +43,9 @@ ai:
 data:
   lookback_days: 365               # history for indicators
   interval: 1d
+
+trader:                            # automated (live / paper) trading
+  interval_seconds: 300            # seconds between cycles for AutoTrader.run()
+  enforce_market_hours: false      # gate to US equities 09:30–16:00 ET, Mon–Fri
+  slippage_bps: 0.0                # simulated slippage for PaperBroker (basis pts)
+  dry_run: false                   # emit signals but never submit orders
