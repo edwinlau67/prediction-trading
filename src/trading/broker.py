@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Literal
 
 from .portfolio import Portfolio, Position, Trade
@@ -39,7 +39,7 @@ class Order:
     stop_loss: float | None = None
     take_profit: float | None = None
     rationale: str = ""
-    submitted_at: datetime = field(default_factory=datetime.utcnow)
+    submitted_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -134,7 +134,7 @@ class PaperBroker(BaseBroker):
         target = order.take_profit if order.take_profit is not None else (
             fill_price * 1.03 if order.side == "long" else fill_price * 0.97
         )
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         position = Position(
             ticker=order.ticker,
             side=order.side,
@@ -167,7 +167,7 @@ class PaperBroker(BaseBroker):
         if ticker not in self.portfolio.positions:
             return None
         price = float(quote if quote is not None else self.get_quote(ticker))
-        ts = when or datetime.utcnow()
+        ts = when or datetime.now(timezone.utc)
         return self.portfolio.close(ticker, price, ts, reason=reason)
 
     # ----------------------------------------------------------- internals

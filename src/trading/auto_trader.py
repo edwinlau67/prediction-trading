@@ -158,12 +158,12 @@ class AutoTrader:
 
     def run_once(self, *, now: datetime | None = None) -> CycleReport:
         """Execute a single full cycle across every watchlist ticker."""
-        started = now or datetime.utcnow()
+        started = now or datetime.now(timezone.utc)
         report = CycleReport(started_at=started, finished_at=started)
 
         if self.market_hours is not None and not self.market_hours.is_open(started):
             self.log.info("Market closed — skipping cycle at %s", started.isoformat())
-            report.finished_at = datetime.utcnow()
+            report.finished_at = datetime.now(timezone.utc)
             self._cycles.append(report)
             return report
 
@@ -182,7 +182,7 @@ class AutoTrader:
         self.portfolio.mark(started, prices)
         report.equity = self.portfolio.equity(prices)
         report.cash = self.portfolio.cash
-        report.finished_at = datetime.utcnow()
+        report.finished_at = datetime.now(timezone.utc)
 
         self._persist(report)
         self._cycles.append(report)

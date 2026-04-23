@@ -7,7 +7,7 @@ cash, trade history, or the equity curve.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,7 @@ class StateStore:
     # ------------------------------------------------------------ writing
     def save(self, portfolio: Portfolio) -> Path:
         payload: dict[str, Any] = {
-            "saved_at": _ts(datetime.utcnow()),
+            "saved_at": _ts(datetime.now(timezone.utc)),
             "initial_capital": portfolio.initial_capital,
             "cash": portfolio.cash,
             "commission_per_trade": portfolio.commission_per_trade,

@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+import logging
 
 try:
     from anthropic import Anthropic
@@ -85,7 +86,7 @@ STOCK_PREDICTION_TOOL = {
     },
 }
 
-SYSTEM_PROMPT = """You are a disciplined equities analyst. When asked for a
+_SYSTEM_PROMPT_BASE = """You are a disciplined equities analyst. When asked for a
 prediction you MUST call the `stock_prediction` tool exactly once with the
 requested ticker and timeframe. After the tool returns, write a concise
 analysis that:
@@ -100,6 +101,13 @@ Do not invent numbers. Use only values returned by the tool. Keep the
 response under 400 words.
 """
 
+_log = logging.getLogger(__name__)
+
+
+def _build_system_prompt(categories: tuple[str, ...]) -> str:
+    cats = ", ".join(sorted(categories)) if categories else "all"
+    return _SYSTEM_PROMPT_BASE.rstrip() + f"\n\nActive indicator categories: {cats}.\n"
+
 
 class AIPredictor:
     """Runs the Claude tool-use loop; falls back to local tool output."""
@@ -110,12 +118,14 @@ class AIPredictor:
         api_key: str | None = None,
         model: str = "claude-sonnet-4-6",
         max_tokens: int = 2000,
+        thinking_budget: int = 0,
         data_fetcher: DataFetcher | None = None,
         categories: tuple[str, ...] | None = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         self.model = model
         self.max_tokens = max_tokens
+        self.thinking_budget = max(0, thinking_budget)
         self.data_fetcher = data_fetcher or DataFetcher()
         self.categories = tuple(categories) if categories else ALL_CATEGORIES
         self._client = None
@@ -200,7 +210,7 @@ class AIPredictor:
             "confidence": round(score.confidence, 3),
             "current_price": round(market.current_price, 4),
             "price_target": round(target, 4),
-            "target_date": (datetime.utcnow() + timedelta(days=days)).date().isoformat(),
+            "target_date": (datetime.now(timezone.utc) + timedelta(days=days)).date().isoformat(),
             "risk_level": risk,
             "key_factors": key_factors,
             "fundamentals": market.fundamentals,
@@ -215,25 +225,45 @@ class AIPredictor:
     def _run_claude(self, ticker: str, timeframe: str,
                     tool_output: dict[str, Any]) -> str:
         """Run the tool-use exchange and return Claude's narrative."""
+        system_prompt = _build_system_prompt(self.categories)
         user_msg = (
             f"Predict {ticker.upper()} over a {timeframe} horizon. "
             "Call the stock_prediction tool, then write the analysis."
         )
         messages: list[dict[str, Any]] = [{"role": "user", "content": user_msg}]
 
+        thinking_enabled = self.thinking_budget > 0
+        effective_max_tokens = (
+            self.thinking_budget + self.max_tokens if thinking_enabled else self.max_tokens
+        )
+        extra_kwargs: dict[str, Any] = {}
+        if thinking_enabled:
+            extra_kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": self.thinking_budget,
+            }
+
         try:
             response = self._client.messages.create(  # type: ignore[union-attr]
                 model=self.model,
-                max_tokens=self.max_tokens,
-                system=[{"type": "text", "text": SYSTEM_PROMPT,
+                max_tokens=effective_max_tokens,
+                system=[{"type": "text", "text": system_prompt,
                          "cache_control": {"type": "ephemeral"}}],
                 tools=[STOCK_PREDICTION_TOOL],
                 messages=messages,
+                **extra_kwargs,
             )
 
             # Handle a single tool_use -> tool_result round-trip.
             if response.stop_reason == "tool_use":
                 tool_use = next(b for b in response.content if b.type == "tool_use")
+                called_ticker = (tool_use.input or {}).get("ticker", "")
+                if called_ticker.upper() != ticker.upper():
+                    _log.warning(
+                        "Claude called stock_prediction with ticker=%r but requested %r; "
+                        "returning pre-computed output for %r",
+                        called_ticker, ticker, ticker,
+                    )
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({
                     "role": "user",
@@ -245,11 +275,12 @@ class AIPredictor:
                 })
                 response = self._client.messages.create(  # type: ignore[union-attr]
                     model=self.model,
-                    max_tokens=self.max_tokens,
-                    system=[{"type": "text", "text": SYSTEM_PROMPT,
+                    max_tokens=effective_max_tokens,
+                    system=[{"type": "text", "text": system_prompt,
                              "cache_control": {"type": "ephemeral"}}],
                     tools=[STOCK_PREDICTION_TOOL],
                     messages=messages,
+                    **extra_kwargs,
                 )
             return "".join(
                 b.text for b in response.content if getattr(b, "type", "") == "text"

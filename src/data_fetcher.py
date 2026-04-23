@@ -6,7 +6,7 @@ indicators and the AI predictor can consume a single source of truth.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -52,10 +52,10 @@ class DataFetcher:
     ) -> pd.DataFrame:
         """Download OHLCV history. Supply either (start, end) or lookback_days."""
         if start is None and lookback_days is not None:
-            start_dt = datetime.utcnow() - timedelta(days=lookback_days)
+            start_dt = datetime.now(timezone.utc) - timedelta(days=lookback_days)
             start = start_dt.strftime("%Y-%m-%d")
         if end is None:
-            end = datetime.utcnow().strftime("%Y-%m-%d")
+            end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         df = yf.download(
             ticker,

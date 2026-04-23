@@ -73,6 +73,10 @@ def _parse_args() -> argparse.Namespace:
         help="Skip the Claude call; emit a rule-based-only prediction.",
     )
     ap.add_argument(
+        "--thinking-budget", type=int, default=0, metavar="TOKENS",
+        help="Enable extended thinking with the given token budget (0 = off).",
+    )
+    ap.add_argument(
         "--out", default="results",
         help="Root directory for run output (default: results).",
     )
@@ -94,6 +98,7 @@ def main() -> int:
         model=args.model,
         data_fetcher=data_fetcher,
         categories=cats,
+        thinking_budget=args.thinking_budget,
     ) if use_ai else None
     predictor = UnifiedPredictor(
         scorer=scorer, ai=ai, ai_enabled=use_ai,
