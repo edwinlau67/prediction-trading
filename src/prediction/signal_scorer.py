@@ -97,6 +97,7 @@ class SignalScorer:
         df: pd.DataFrame,
         *,
         weekly: pd.DataFrame | None = None,
+        hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
     ) -> ScoredSignal:
         if df.empty:
@@ -131,6 +132,19 @@ class SignalScorer:
                     detail="weekly timeframe agrees with daily",
                 ))
                 net += bonus if wk > 0 else -bonus
+
+        # 4H timeframe confluence bonus
+        if hourly_4h is not None and not hourly_4h.empty:
+            h4 = self._score_frame_points(hourly_4h)
+            if h4 != 0 and ((net > 0 and h4 > 0) or (net < 0 and h4 < 0)):
+                h4_bonus = max(1, self.multi_timeframe_bonus - 1)
+                factors.append(Factor(
+                    category="trend", name="4H confluence",
+                    direction="bullish" if h4 > 0 else "bearish",
+                    points=h4_bonus,
+                    detail="4-hour timeframe agrees with daily",
+                ))
+                net += h4_bonus if h4 > 0 else -h4_bonus
 
         abs_pts = sum(abs(f.signed) for f in factors) or 1
         confidence = float(min(1.0, abs(net) / self.confidence_scale))
