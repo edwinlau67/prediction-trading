@@ -21,6 +21,7 @@ ATR, Fundamental grid), the `predictions.md` layout, and the
 prediction-trading/
 ├── stock_predictor.py                  # CLI mirroring stock-prediction (primary predictor)
 ├── automated_trader.py                 # CLI for the live / paper trading engine
+├── scan_watchlist.py                   # CLI for parallel rule-based watchlist screening
 ├── config/default.yaml                 # portfolio, risk, signal, trader, AI defaults
 ├── DESIGN.md                           # architecture and scoring model
 ├── src/
@@ -29,6 +30,7 @@ prediction-trading/
 │   ├── indicators/
 │   │   ├── technical.py                # SMA, EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV
 │   │   └── levels.py                   # pivots, Fibonacci, swing trendlines
+│   ├── scanner.py                      # WatchlistScanner — parallel rule-based screening
 │   ├── prediction/
 │   │   ├── factor.py                   # Factor model + IndicatorCategory enum
 │   │   ├── signal_scorer.py            # point-based scorer with category filtering
@@ -116,8 +118,9 @@ usage: stock_predictor.py [-h] [--tickers TICKER [TICKER ...]]
   --model       Claude model ID (default: claude-sonnet-4-6)
   --indicators  Indicator categories (default: all six)
                 Choices: trend momentum volatility volume support fundamental
-  --no-ai       Skip the Claude call; rule-based-only run.
-  --out         Output root directory (default: results/)
+  --no-ai            Skip the Claude call; rule-based-only run.
+  --thinking-budget  Token budget for extended thinking (0 = disabled, e.g. 10000).
+  --out              Output root directory (default: results/)
 ```
 
 ### Supported timeframes and models
@@ -330,6 +333,38 @@ All portfolio sizing, stop / take-profit ATR multiples, min R:R, daily
 loss cap, and min confidence still come from the existing `portfolio:`
 / `risk:` / `signals:` sections, so backtest parameters and live
 parameters stay in lockstep.
+
+## Watchlist scanner
+
+`scan_watchlist.py` screens many tickers in parallel with the rule-based
+engine (no API key needed) and prints a ranked confidence table.
+
+```bash
+# Scan a list of tickers (all six indicator categories)
+python scan_watchlist.py AAPL TSLA NVDA MSFT GOOG
+
+# Only show results with ≥ 40% confidence
+python scan_watchlist.py AAPL TSLA NVDA --min-confidence 0.4
+
+# Restrict to specific indicator categories
+python scan_watchlist.py AAPL TSLA --indicators trend momentum
+
+# Increase parallelism
+python scan_watchlist.py $(cat my_watchlist.txt) --workers 8
+```
+
+Output is a colour-coded terminal table sorted by confidence descending,
+showing direction, confidence %, current price, and top 3 scored factors.
+
+`WatchlistScanner` is also available as a Python API (`src/scanner.py`):
+
+```python
+from src.scanner import WatchlistScanner
+
+results = WatchlistScanner(min_confidence=0.4, workers=8).scan(["AAPL", "TSLA", "NVDA"])
+for r in results:
+    print(r.ticker, r.direction, r.confidence)
+```
 
 ## Prompt caching
 

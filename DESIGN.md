@@ -13,7 +13,8 @@ trading** (with portfolio/risk management).
 ┌──────────────────────────────────────────────────────────────────┐
 │                         CLI entrypoints                           │
 │   stock_predictor.py         examples/02_backtest.py              │
-│   examples/01_predict.py     examples/03_multi_ticker.py          │
+│   automated_trader.py        examples/03_multi_ticker.py          │
+│   scan_watchlist.py          examples/01_predict.py               │
 └──────────────────┬───────────────────────────────┬────────────────┘
                    │                               │
 ┌──────────────────▼───────────────┐   ┌──────────▼──────────────────┐
@@ -23,6 +24,12 @@ trading** (with portfolio/risk management).
 │  • AIPredictor (Claude tool use) │   │   wires everything together) │
 │  • UnifiedPredictor (fuse)       │   └──────────┬──────────────────┘
 └──────────────────┬───────────────┘              │
+                   │ also used by                 │
+┌──────────────────▼───────────────┐              │
+│  scanner.py                      │              │
+│  • WatchlistScanner (parallel)   │              │
+│  • ScanResult                    │              │
+└──────────────────────────────────┘              │
                    │                               │
 ┌──────────────────▼───────────────────────────────▼──────────────────┐
 │  reporting/                                                          │
@@ -99,7 +106,27 @@ drives three things:
 The three always-present chart panels (Price + Target, Confidence & Risk
 arc gauge, Signal Factors bar chart) render regardless of selection.
 
-## 4. The Claude tool-use flow
+## 4. Watchlist scanner (`WatchlistScanner`)
+
+`src/scanner.py` provides a lightweight, API-key-free screening path that
+reuses `SignalScorer` without the chart or reporting stack:
+
+```
+scan_watchlist.py ──► WatchlistScanner.scan(tickers)
+                           │  ThreadPoolExecutor (default 4 workers)
+                           ▼
+                      _scan_one(ticker)
+                           │  DataFetcher.fetch (OHLCV only, no fundamentals)
+                           │  TechnicalIndicators.compute_all
+                           │  SignalScorer.score → direction, confidence, top factors
+                           ▼
+                      [ScanResult, …] ranked by confidence descending
+```
+
+Category filtering (`--indicators`) works identically to `stock_predictor.py`
+— only the specified categories contribute to scoring.
+
+## 5. The Claude tool-use flow
 
 ```
 CLI ──► AIPredictor ──► Anthropic Messages API
@@ -124,7 +151,15 @@ repeated calls within 5 minutes are served at ~10% input cost (identical
 to `stock-prediction`). When no `ANTHROPIC_API_KEY` is set the flow
 transparently degrades to returning just the local tool output.
 
-## 5. Fused prediction (`UnifiedPredictor`)
+**Active category injection** — the active `--indicators` categories are
+embedded in the system prompt so Claude's narrative only references scored
+indicators, keeping the text consistent with the chart.
+
+**Extended thinking** — pass `--thinking-budget N` (e.g. `10000`) to
+`stock_predictor.py` to enable Claude's extended thinking on both API
+calls. Disabled by default (`0`).
+
+## 6. Fused prediction (`UnifiedPredictor`)
 
 ```python
 blended = (1 - ai_weight) * rule_signed + ai_weight * ai_signed
@@ -135,12 +170,12 @@ Direction flips at |blended| > 0.05; confidence = |blended| (clipped 0..1).
 When the AI is disabled the fused output is identical to the rule-based
 output, so the trading pipeline works without any API key.
 
-## 6. Report and chart layout
+## 7. Report and chart layout
 
 Both pipelines write into a **single `results/` root** with self-describing
 prefixed subfolders, so predictions and backtests live side by side.
 
-### 6a. Prediction CLI — `stock_predictor.py`
+### 7a. Prediction CLI — `stock_predictor.py`
 
 ```
 results/
@@ -162,7 +197,7 @@ results/
 6. 📏 Fibonacci Retracement Levels (0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100%)
 7. 📝 Analysis (Claude narrative, or deterministic fallback)
 
-### 6b. Backtest — `PredictionTradingSystem.save_report`
+### 7b. Backtest — `PredictionTradingSystem.save_report`
 
 ```
 results/
@@ -175,7 +210,7 @@ results/
         └── risk.png
 ```
 
-## 7. Risk management
+## 8. Risk management
 
 | Gate                        | Default          | Description                                      |
 | --------------------------- | ---------------- | ------------------------------------------------ |
