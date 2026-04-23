@@ -53,6 +53,18 @@ prediction-trading/
 └── tests/                              # 32 unit + integration tests
 ```
 
+## Web UI
+
+The fastest way to use the system is the Streamlit dashboard:
+
+```bash
+streamlit run app.py          # opens http://localhost:8501
+```
+
+Six pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Settings**
+
+See [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) for a full walkthrough.
+
 ## Quick start
 
 ```bash
