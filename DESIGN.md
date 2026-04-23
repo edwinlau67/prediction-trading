@@ -8,6 +8,8 @@ Source lineage:
 |---|---|
 | [`edwinlau67/stock-prediction`](https://github.com/edwinlau67/stock-prediction) | Claude tool-use predictor, rich `predictions.md`, six indicator categories, fundamental scoring |
 | [`edwinlau67/automated-trading-systems`](https://github.com/edwinlau67/automated-trading-systems) | Multi-timeframe scoring, portfolio/position/trade primitives, ATR-based risk manager, bar-by-bar backtester, risk profiles |
+| [`edwinlau67/algorithmic-trading-system`](https://github.com/edwinlau67/algorithmic-trading-system) | Comprehensive algorithmic trading system with multiple strategies, risk management, and backtesting capabilities |
+
 
 ---
 
@@ -24,17 +26,17 @@ Source lineage:
 │                      src/system.py — PredictionTradingSystem                │
 │  (high-level façade: fetch / predict / backtest / save_report /             │
 │   build_auto_trader)                                                        │
-└──────┬───────────────────┬──────────────────┬──────────────────────────────┘
+└──────┬───────────────────┬──────────────────┬───────────────────────────────┘
        │                   │                  │
-┌──────▼──────────┐  ┌─────▼─────────────┐  ┌▼───────────────────────────────┐
-│  PREDICTION     │  │    TRADING         │  │          BACKTEST               │
-│                 │  │                    │  │                                 │
-│ SignalScorer    │  │ Portfolio           │  │ Backtester (bar-by-bar,         │
-│ AIPredictor     │  │ RiskManager        │  │  200-bar warmup, no look-ahead) │
-│ UnifiedPredictor│  │ AutoTrader         │  └─────────────────────────────────┘
-└──────┬──────────┘  │ PaperBroker        │
-       │             │ StateStore         │
-┌──────▼──────────┐  └────────────────────┘
+┌──────▼──────────┐  ┌─────▼─────────────┐   ┌▼───────────────────────────────┐
+│  PREDICTION     │  │    TRADING        │   │          BACKTEST              │
+│                 │  │                   │   │                                │
+│ SignalScorer    │  │ Portfolio         │   │ Backtester (bar-by-bar,        │
+│ AIPredictor     │  │ RiskManager       │   │ 200-bar warmup, no look-ahead) │
+│ UnifiedPredictor│  │ AutoTrader        │   └────────────────────────────────┘
+└──────┬──────────┘  │ PaperBroker       │
+       │             │ StateStore        │
+┌──────▼──────────┐  └───────────────────┘
 │ scanner.py      │
 │ WatchlistScanner│ (parallel, no AI or charts)
 └──────┬──────────┘
@@ -47,7 +49,7 @@ Source lineage:
        │
 ┌──────▼──────────────────────────────────────────────────────────────────────┐
 │                           INDICATORS & DATA                                 │
-│  TechnicalIndicators (SMA/EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV)        │
+│  TechnicalIndicators (SMA/EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV)         │
 │  SupportResistance (pivots, Fibonacci, swing trendlines)                    │
 │  DataFetcher (yfinance OHLCV + fundamentals)                                │
 └─────────────────────────────────────────────────────────────────────────────┘

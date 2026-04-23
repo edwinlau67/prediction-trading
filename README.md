@@ -8,6 +8,7 @@ This project merges two upstream repositories into one end-to-end pipeline:
 | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | [`edwinlau67/stock-prediction`](https://github.com/edwinlau67/stock-prediction)                    | Claude (Anthropic) tool-use predictor, rich `predictions.md` + dynamic multi-panel analysis chart, six indicator categories, fundamental scoring. |
 | [`edwinlau67/automated-trading-systems`](https://github.com/edwinlau67/automated-trading-systems) | Multi-timeframe weighted scoring, portfolio / position / trade primitives, ATR-based risk manager, bar-by-bar backtester, performance reports. |
+| [`edwinlau67/algorithmic-trading-system`](https://github.com/edwinlau67/algorithmic-trading-system) | Comprehensive algorithmic trading system with multiple strategies, risk management, and backtesting capabilities |
 
 Every feature from `stock-prediction`'s README — including the CLI, the
 six `--indicators` categories, the dynamic chart panels (confidence arc
