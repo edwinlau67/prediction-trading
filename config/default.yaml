@@ -6,6 +6,7 @@ portfolio:
   max_positions: 5
   max_position_size_pct: 0.05      # fraction of equity per position
   commission_per_trade: 1.0        # flat fee per fill
+  risk_profile: moderate           # conservative | moderate | aggressive | custom
 
 risk:
   max_daily_loss_pct: 0.02         # halt new trades if daily loss >= 2%

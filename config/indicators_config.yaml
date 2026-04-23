@@ -1,0 +1,49 @@
+# Per-indicator period and threshold reference.
+# TechnicalIndicators.compute_all() uses these as canonical defaults.
+
+moving_averages:
+  sma_periods: [20, 50, 200]
+  ema_periods: [12, 20, 26]
+
+macd:
+  fast: 12
+  slow: 26
+  signal: 9
+
+rsi:
+  period: 14
+  oversold: 30
+  overbought: 70
+  midline: 50
+
+stochastic:
+  k_period: 14
+  d_period: 3
+  oversold: 20
+  overbought: 80
+
+bollinger:
+  period: 20
+  num_std: 2.0
+
+atr:
+  period: 14
+  elevated_ratio: 1.3       # ATR > mean * this → high vol (bearish signal)
+  calm_ratio: 0.8           # ATR < mean * this → low vol (bullish signal)
+  lookback_mean: 20
+
+adx:
+  period: 14
+  trend_threshold: 25       # ADX > this → trending market
+
+volume:
+  spike_window: 20
+  spike_std: 2.0            # volume > mean + spike_std * σ → spike
+
+support_resistance:
+  fibonacci_lookback: 126   # bars (~6 months) for Fibonacci range
+  trendline_window: 5
+
+multi_timeframe:
+  weekly_bonus: 2           # extra points when weekly agrees with daily
+  hourly_4h_bonus: 1        # extra points when 4H agrees with daily

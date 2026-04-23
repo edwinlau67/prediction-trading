@@ -1,0 +1,47 @@
+# Risk profile presets. The Settings page merges the chosen profile into
+# config/default.yaml when "Apply Profile" is clicked.
+
+conservative:
+  portfolio:
+    max_positions: 3
+    max_position_size_pct: 0.03      # 3% of equity per position
+  risk:
+    max_daily_loss_pct: 0.01         # halt at -1% daily
+    min_risk_reward: 2.0             # tighter R:R
+    stop_loss_atr_mult: 1.5
+    take_profit_atr_mult: 3.0
+  signals:
+    min_confidence: 0.60             # only high-confidence signals
+    multi_timeframe_bonus: 3
+
+moderate:                            # mirrors current defaults
+  portfolio:
+    max_positions: 5
+    max_position_size_pct: 0.05
+  risk:
+    max_daily_loss_pct: 0.02
+    min_risk_reward: 1.5
+    stop_loss_atr_mult: 2.0
+    take_profit_atr_mult: 3.0
+  signals:
+    min_confidence: 0.40
+    multi_timeframe_bonus: 2
+
+aggressive:
+  portfolio:
+    max_positions: 8
+    max_position_size_pct: 0.10      # 10% of equity per position
+  risk:
+    max_daily_loss_pct: 0.05         # allow -5% daily
+    min_risk_reward: 1.2
+    stop_loss_atr_mult: 2.5
+    take_profit_atr_mult: 4.0
+  signals:
+    min_confidence: 0.30
+    multi_timeframe_bonus: 1
+
+custom:
+  # Sentinel — UI leaves existing config values unchanged.
+  portfolio: {}
+  risk: {}
+  signals: {}
