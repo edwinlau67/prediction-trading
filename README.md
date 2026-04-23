@@ -22,8 +22,22 @@ prediction-trading/
 ├── stock_predictor.py                  # CLI mirroring stock-prediction (primary predictor)
 ├── automated_trader.py                 # CLI for the live / paper trading engine
 ├── scan_watchlist.py                   # CLI for parallel rule-based watchlist screening
-├── config/default.yaml                 # portfolio, risk, signal, trader, AI defaults
+├── app.py                              # Streamlit web UI entry point
+├── config/
+│   ├── default.yaml                    # portfolio, risk, signal, trader, AI defaults
+│   ├── risk_profiles.yaml              # conservative / moderate / aggressive presets
+│   └── indicators_config.yaml          # per-indicator period/threshold reference
 ├── DESIGN.md                           # architecture and scoring model
+├── docs/
+│   ├── TRADING_SYSTEM_GUIDE.md         # full end-to-end walkthrough
+│   ├── API_REFERENCE.md                # Python API reference
+│   ├── ARCHITECTURE.md                 # architecture deep-dive
+│   ├── EXAMPLES.md                     # annotated code examples
+│   └── QUICK_REFERENCE.md              # CLI/API cheat-sheet
+├── ui/
+│   ├── state.py                        # session_state key constants
+│   ├── components.py                   # shared widgets (metric cards, charts, tables)
+│   └── pages/                          # one module per Streamlit page
 ├── src/
 │   ├── system.py                       # PredictionTradingSystem (predict / backtest / build_auto_trader)
 │   ├── data_fetcher.py                 # yfinance wrapper (OHLCV + fundamentals)
@@ -44,6 +58,7 @@ prediction-trading/
 │   │   └── auto_trader.py              # AutoTrader — live/paper loop runner
 │   ├── backtest/backtester.py          # bar-by-bar engine
 │   ├── reporting/
+│   │   ├── base.py                     # BaseChart + BaseReportWriter (shared helpers)
 │   │   ├── prediction_chart.py         # dynamic multi-panel analysis chart
 │   │   ├── prediction_report.py        # predictions.md writer
 │   │   ├── charts.py                   # 4-chart backtest dashboard
@@ -63,7 +78,13 @@ streamlit run app.py          # opens http://localhost:8501
 
 Six pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Settings**
 
-See [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) for a full walkthrough.
+| Doc | Contents |
+| --- | -------- |
+| [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough |
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Python API reference |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture deep-dive |
+| [`docs/EXAMPLES.md`](docs/EXAMPLES.md) | Annotated code examples |
+| [`docs/QUICK_REFERENCE.md`](docs/QUICK_REFERENCE.md) | CLI/API cheat-sheet |
 
 ## Quick start
 
@@ -345,6 +366,16 @@ All portfolio sizing, stop / take-profit ATR multiples, min R:R, daily
 loss cap, and min confidence still come from the existing `portfolio:`
 / `risk:` / `signals:` sections, so backtest parameters and live
 parameters stay in lockstep.
+
+### Risk profiles
+
+`config/risk_profiles.yaml` ships three presets selectable from the Settings page:
+
+| Profile | Position size | Daily limit | Min confidence | Stop ATR | Target ATR | Min R:R |
+| ------- | ------------- | ----------- | -------------- | -------- | ---------- | ------- |
+| conservative | 3% | 1% | 60% | 1.5× | 3.0× | 2.0 |
+| moderate | 5% | 2% | 40% | 2.0× | 3.0× | 1.5 |
+| aggressive | 10% | 5% | 30% | 2.5× | 4.0× | 1.2 |
 
 ## Watchlist scanner
 
