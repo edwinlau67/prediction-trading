@@ -92,6 +92,7 @@ class TechnicalIndicators:
         minus_di = 100.0 * pd.Series(minus_dm, index=high.index).ewm(
             alpha=1 / period, adjust=False, min_periods=period).mean() / atr
         dx = 100.0 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0.0, np.nan)
+        dx = dx.fillna(50.0)
         adx = dx.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
         return adx, plus_di, minus_di
 

@@ -38,6 +38,7 @@ class BacktestResult:
         losses = [t for t in trades if not t.is_win]
         avg_win = sum(t.pnl for t in wins) / len(wins) if wins else 0.0
         avg_loss = sum(t.pnl for t in losses) / len(losses) if losses else 0.0
+        total_loss_abs = abs(sum(t.pnl for t in losses))
         return {
             "ticker": self.ticker,
             "period": f"{self.start.date()} -> {self.end.date()}",
@@ -49,9 +50,8 @@ class BacktestResult:
             "win_rate_pct": round(p.win_rate, 2),
             "avg_win": round(avg_win, 2),
             "avg_loss": round(avg_loss, 2),
-            "profit_factor": round(abs(sum(t.pnl for t in wins)) /
-                                   abs(sum(t.pnl for t in losses)), 2)
-                             if losses and sum(t.pnl for t in losses) != 0 else None,
+            "profit_factor": round(abs(sum(t.pnl for t in wins)) / total_loss_abs, 2)
+                             if total_loss_abs > 0 else None,
         }
 
 
