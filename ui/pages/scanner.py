@@ -33,7 +33,7 @@ def render() -> None:
         categories = st.multiselect(
             "Indicator Categories",
             _ALL_CATEGORIES,
-            default=_ALL_CATEGORIES[:4],
+            default=_ALL_CATEGORIES,
         )
 
     tickers = [t.strip().upper() for t in raw.splitlines() if t.strip()]
@@ -67,7 +67,6 @@ def _run_scan(
         st.session_state[SCAN_RESULTS] = results
     except Exception as exc:
         st.error(f"Scan failed: {exc}")
-        raise
 
 
 def _show_results(results: list) -> None:

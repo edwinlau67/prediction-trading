@@ -31,6 +31,7 @@ def render() -> None:
     portfolio = cfg.get("portfolio", {})
     risk = cfg.get("risk", {})
     signals = cfg.get("signals", {})
+    indicators = cfg.get("indicators", {})
     ai = cfg.get("ai", {})
     trader = cfg.get("trader", {})
 
@@ -120,6 +121,18 @@ def render() -> None:
             step=0.05,
         )
 
+    # ── Indicators ────────────────────────────────────────────────────────────
+    _ALL_CATS = ["trend", "momentum", "volatility", "volume", "support", "fundamental"]
+    st.subheader("Indicator Categories")
+    indicators["categories"] = st.multiselect(
+        "Active Categories",
+        _ALL_CATS,
+        default=indicators.get("categories") or _ALL_CATS,
+        help="Controls which rules run, which chart panels render, and what the AI prompt includes.",
+    )
+
+    st.divider()
+
     # ── AI ────────────────────────────────────────────────────────────────────
     st.subheader("AI / Claude Settings")
     col7, col8 = st.columns(2)
@@ -169,6 +182,7 @@ def render() -> None:
         cfg["portfolio"] = portfolio
         cfg["risk"] = risk
         cfg["signals"] = signals
+        cfg["indicators"] = indicators
         cfg["ai"] = ai
         cfg["trader"] = trader
         _save(_DEFAULT_CFG, cfg)
