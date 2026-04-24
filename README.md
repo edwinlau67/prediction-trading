@@ -38,6 +38,8 @@ prediction-trading/
 ├── ui/
 │   ├── state.py                        # session_state key constants
 │   ├── components.py                   # shared widgets (metric cards, charts, tables)
+│   ├── theme.py                        # CSS injection for light/dark themes
+│   ├── watchlist.py                    # persistent watchlist sidebar with live price badges
 │   └── pages/                          # one module per Streamlit page
 ├── src/
 │   ├── system.py                       # PredictionTradingSystem (predict / backtest / build_auto_trader)
@@ -66,7 +68,7 @@ prediction-trading/
 │   │   └── report.py                   # backtest report.md
 │   └── logger.py
 ├── examples/                           # predict + backtest + live-trading examples
-└── tests/                              # 52 unit + integration tests
+└── tests/                              # 78 unit + integration tests
 ```
 
 ## Web UI
@@ -77,7 +79,9 @@ The fastest way to use the system is the Streamlit dashboard:
 streamlit run app.py          # opens http://localhost:8501
 ```
 
-Six pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Settings**
+Seven pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Alerts** · **Settings**
+
+Navigation uses a top bar (not sidebar) with a light/dark theme toggle. A persistent watchlist sidebar shows live price badges and quick-links into the Predict page.
 
 | Doc | Contents |
 | --- | -------- |
@@ -431,7 +435,7 @@ prefix at ~10% of input token cost (same mechanism as `stock-prediction`).
 
 ```bash
 pytest tests/ -v
-# 52 passed
+# 78 passed
 ```
 
 All tests use synthetic OHLCV fixtures, so they run offline and without

@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.2 |
+| Version | 1.3 |
 | Status | Active |
-| Last updated | 2026-04-23 |
+| Last updated | 2026-04-24 |
 
 ---
 
@@ -476,7 +476,11 @@ Errors in individual tickers are caught and returned as `ScanResult(error=str(ex
 
 ## 5. Streamlit Web UI (`app.py`, `ui/`)
 
-Entry point: `streamlit run app.py` (default port 8501). Six pages via sidebar radio.
+Entry point: `streamlit run app.py` (default port 8501). Seven pages via a **top navigation bar** (sidebar nav was replaced). A light/dark theme toggle lives in the header. A **persistent watchlist sidebar** (`ui/watchlist.py`) shows live price badges and quick-links into the Predict page; it is rendered on every page via `render_sidebar()`.
+
+Additional UI modules:
+- `ui/theme.py` — CSS injection for light/dark themes via `inject_theme(dark: bool)`.
+- `ui/watchlist.py` — watchlist state persisted to `watchlist.json`; tickers can be added/removed from any page.
 
 ### 5.1 Page inventory
 
@@ -487,6 +491,7 @@ Entry point: `streamlit run app.py` (default port 8501). Six pages via sidebar r
 | Scanner | `ui/pages/scanner.py` | Watchlist textarea, min-confidence slider, workers slider, category multiselect (default: all six). CSV export. |
 | Backtest | `ui/pages/backtest.py` | Date pickers, capital/commission inputs. Calls `system.backtest()`. Equity curve + trade log. Save full report button. |
 | Trading | `ui/pages/trading.py` | Start/stop AutoTrader (daemon thread + `queue.Queue`). Live cycle reports, positions monitor, error log. 10 s auto-rerun. |
+| Alerts | `ui/pages/alerts.py` | Price/confidence/P&L trigger management. Triggers: price above/below, confidence ≥, daily P&L ≥/≤. Alert state persisted to `alerts.json`. |
 | Settings | `ui/pages/settings.py` | Risk profile selector (conservative/moderate/aggressive). Sliders for all `default.yaml` sections including indicator categories. Saves on button click. |
 
 ### 5.2 Session state contract
@@ -560,7 +565,8 @@ results/backtest_TICKER_YYYYMMDD_HHMMSS/
 ```
 results/live_YYYYMMDD_HHMMSS/
 ├── portfolio_state.json    # Portfolio snapshot (resumable)
-└── trades.csv              # append-only closed trade log
+├── trades.csv              # append-only closed trade log
+└── prediction_trading.log  # structured cycle log
 ```
 
 ---
@@ -641,8 +647,12 @@ All tests run offline — no network, no API key required.
 | `test_scanner.py` | 6 | Results returned and ranked, confidence filtering, per-ticker error isolation, category subset, worker count |
 | `test_backtester.py` | 2 | End-to-end backtest with synthetic uptrend; profit_factor None on zero-PnL losses |
 | `test_indicators.py` | 7 | SMA/EMA manual comparison, RSI bounded [0,100], MACD histogram sign, Bollinger envelope, ATR positive, compute_all columns, pivot/Fibonacci |
+| `test_ai_predictor.py` | 5 | Offline fallback (no API key), tool-call construction, degraded mode, prompt caching headers |
+| `test_data_fetcher.py` | 7 | OHLCV shape, DatetimeIndex tz-stripping, fundamentals best-effort, interval parameter, fetch_history date range |
+| `test_reporting.py` | 8 | Prediction chart panel selection (always-present + category-conditional), report writer output structure, backtest chart builder |
+| `test_unified_predictor.py` | 6 | AI/rule fusion formula, ai_weight=0 fallback, actionable flag, neutral deadband, min_confidence gate |
 
-**Total: 52 tests.**
+**Total: 78 tests.**
 
 ---
 

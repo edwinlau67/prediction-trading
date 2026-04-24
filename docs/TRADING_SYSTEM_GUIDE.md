@@ -29,7 +29,7 @@ cp .env.example .env
 
 Verify:
 ```bash
-pytest tests/ -v          # 32 tests, all offline — no API key needed
+pytest tests/ -v          # 78 tests, all offline — no API key needed
 python stock_predictor.py --tickers AAPL --no-ai
 ```
 
@@ -41,7 +41,7 @@ python stock_predictor.py --tickers AAPL --no-ai
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Six pages available via the left sidebar:
+Opens at `http://localhost:8501`. Seven pages via a top navigation bar (with a light/dark theme toggle in the header). A persistent watchlist sidebar shows live price badges on every page.
 
 | Page | What it does |
 |---|---|
@@ -50,6 +50,7 @@ Opens at `http://localhost:8501`. Six pages available via the left sidebar:
 | **Scanner** | Parallel watchlist scan with BUY/SELL/HOLD table and CSV export |
 | **Backtest** | Historical simulation with equity curve, metrics, and trade log |
 | **Trading** | Start/stop AutoTrader, monitor live portfolio and cycle reports |
+| **Alerts** | Manage price/confidence/P&L triggers; alert state persisted to `alerts.json` |
 | **Settings** | Apply risk profiles, tune all parameters, save to `config/default.yaml` |
 
 ---
