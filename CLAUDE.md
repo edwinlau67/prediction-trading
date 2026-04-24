@@ -32,6 +32,12 @@ python automated_trader.py --tickers AAPL TSLA --dry-run --once
 # Continuous paper trading every 5 min, market hours only
 python automated_trader.py --tickers AAPL --interval 300 --market-hours
 
+# Launch Streamlit web UI
+streamlit run app.py
+
+# Scan watchlist (bulk signal scoring)
+python scan_watchlist.py --tickers AAPL TSLA NVDA
+
 # Run all tests (offline — no API key required)
 pytest tests/ -v
 
@@ -44,7 +50,8 @@ pytest tests/test_signal_scorer.py -v
 The system has four layers, wired together by `src/system.py:PredictionTradingSystem` (the primary entry point for Python API usage):
 
 ```
-CLI entrypoints (stock_predictor.py, automated_trader.py)
+CLI entrypoints (stock_predictor.py, automated_trader.py, scan_watchlist.py)
+Web UI          (streamlit run app.py → ui/ — 7 pages)
         │
 src/system.py — PredictionTradingSystem (facade)
         │
@@ -56,6 +63,7 @@ src/backtest/       ← bar-by-bar Backtester
         │
 src/indicators/     ← TechnicalIndicators, SupportResistance
 src/data_fetcher.py ← yfinance OHLCV + fundamentals
+ui/                 ← Streamlit web app (Dashboard, Predict, Scanner, Backtest, Trading, Alerts, Settings)
 ```
 
 ### Prediction pipeline
@@ -83,7 +91,7 @@ All runs write under `results/` with self-describing prefixes:
 
 ### Tests
 
-All 32 tests use synthetic OHLCV fixtures defined in `tests/conftest.py` (`ohlcv_uptrend`, `ohlcv_downtrend`, `ohlcv_sideways`) — no network or API key required.
+All 52 tests across 11 files use synthetic OHLCV fixtures defined in `tests/conftest.py` (`ohlcv_uptrend`, `ohlcv_downtrend`, `ohlcv_sideways`) — no network or API key required.
 
 ### Config
 
