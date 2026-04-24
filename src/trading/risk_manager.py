@@ -36,7 +36,7 @@ class RiskManager:
         min_risk_reward: float = 1.5,
         stop_loss_atr_mult: float = 2.0,
         take_profit_atr_mult: float = 3.0,
-        min_confidence: float = 0.55,
+        min_confidence: float = 0.40,
     ) -> None:
         self.max_positions = max_positions
         self.max_position_size_pct = max_position_size_pct
