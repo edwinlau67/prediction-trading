@@ -98,7 +98,12 @@ class Portfolio:
         if ticker not in self.positions:
             raise KeyError(f"No open position in {ticker}")
         pos = self.positions.pop(ticker)
-        proceeds = pos.quantity * price - self.commission_per_trade
+        if pos.side == "long":
+            proceeds = pos.quantity * price - self.commission_per_trade
+        else:
+            # Margin model: open() deducted entry_price*qty as collateral.
+            # On close, return collateral + unrealised P&L, minus commission.
+            proceeds = (2 * pos.entry_price - price) * pos.quantity - self.commission_per_trade
         self.cash += proceeds
         pnl = pos.unrealised(price) - (2 * self.commission_per_trade)
         trade = Trade(
