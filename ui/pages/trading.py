@@ -202,16 +202,14 @@ def _start_trader(
 
     except Exception as exc:
         st.error(f"Could not start AutoTrader: {exc}")
-        raise
 
 
 def _trader_loop(trader, interval: int, q: queue.Queue) -> None:
     """Daemon thread: run one cycle, put result in queue, sleep, repeat."""
     while st.session_state.get(TRADER_RUNNING, False):
         try:
-            reports = trader.run(once=True)
-            for r in (reports or []):
-                q.put(r)
+            report = trader.run_once()
+            q.put(report)
         except Exception as exc:
             q.put(exc)
         time.sleep(interval)
