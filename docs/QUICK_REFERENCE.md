@@ -132,7 +132,7 @@ trader = sys.build_auto_trader(
     state_path="results/live/portfolio_state.json",
     dry_run=True,
 )
-reports = trader.run(once=True)
+report = trader.run_once()
 ```
 
 ---

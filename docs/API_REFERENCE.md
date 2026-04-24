@@ -29,7 +29,12 @@ class PredictionTradingSystem:
         end: str | None = None,
     ) -> MarketData
 
-    def predict(self, market: MarketData | None = None) -> Prediction
+    def predict(
+        self,
+        market: MarketData | None = None,
+        *,
+        hourly_4h: pd.DataFrame | None = None,  # 4H-resampled enriched OHLCV for confluence
+    ) -> Prediction
         # Runs TechnicalIndicators.compute_all, weekly resampling, and UnifiedPredictor.
 
     def backtest(self, start: str, end: str) -> BacktestResult
