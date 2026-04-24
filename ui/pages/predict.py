@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from ui.components import confidence_badge, prediction_card
+from ui.components import candlestick_chart, prediction_card
 from ui.state import PREDICT_CHART_PATH, PREDICT_OHLCV, PREDICT_RESULT, PREDICT_TICKER
 
 _TIMEFRAMES = ["1d", "1w", "1m", "3m", "6m", "ytd", "1y", "2y", "5y"]
@@ -14,14 +14,17 @@ _ALL_CATEGORIES = ["trend", "momentum", "volatility", "volume", "support", "fund
 
 
 def render() -> None:
-    st.title("Predict")
-    st.caption("Run a technical + optional AI prediction for any ticker.")
+    st.markdown("## 🔮 Predict")
 
     # ── Inputs ────────────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
     with col1:
-        ticker = st.text_input("Ticker Symbol", value="AAPL",
-                               placeholder="e.g. AAPL, TSLA").upper().strip()
+        # Pre-fill from watchlist click
+        prefill = st.session_state.get(PREDICT_TICKER, "AAPL")
+        ticker = st.text_input(
+            "Ticker Symbol", value=prefill,
+            placeholder="e.g. AAPL, TSLA",
+        ).upper().strip()
     with col2:
         timeframe = st.selectbox("Prediction Timeframe", _TIMEFRAMES, index=1)
 
@@ -37,11 +40,11 @@ def render() -> None:
         enable_ai = st.toggle("Enable AI (Claude)", value=False)
     with col4:
         use_4h = st.toggle("4H Confluence", value=False,
-                           help="Fetch 4-hour OHLCV and add confluence bonus when 4H agrees with daily.")
+                           help="Fetch 4-hour OHLCV and add confluence bonus.")
     with col5:
         save_report = st.checkbox("Save report to results/", value=False)
 
-    run = st.button("Run Prediction", type="primary", disabled=not ticker)
+    run = st.button("▶ Run Prediction", type="primary", disabled=not ticker)
 
     if run and ticker:
         with st.spinner(f"Fetching data and running prediction for **{ticker}**..."):
@@ -50,15 +53,40 @@ def render() -> None:
     # ── Results ───────────────────────────────────────────────────────────────
     prediction = st.session_state.get(PREDICT_RESULT)
     cached_ticker = st.session_state.get(PREDICT_TICKER, "")
+    ohlcv = st.session_state.get(PREDICT_OHLCV)
 
     if prediction is not None and cached_ticker == ticker:
         st.divider()
-        st.subheader(f"Results — {ticker}")
-        prediction_card(prediction)
 
-        chart_path = st.session_state.get(PREDICT_CHART_PATH)
-        if chart_path and Path(str(chart_path)).exists():
-            st.image(str(chart_path), use_container_width=True)
+        tab_signal, tab_chart, tab_static = st.tabs(
+            ["📊 Signal", "🕯️ Candlestick Chart", "📈 Analysis Chart"]
+        )
+
+        with tab_signal:
+            prediction_card(prediction)
+
+        with tab_chart:
+            if ohlcv is not None:
+                entry = getattr(prediction, "current_price", None)
+                # Get stop/target from the prediction's AI signal if available
+                ai_sig = getattr(prediction, "ai_signal", None)
+                stop_p = None
+                target_p = getattr(prediction, "price_target", None)
+                candlestick_chart(
+                    ohlcv, title=f"{ticker} — Last 120 Bars",
+                    entry_price=entry,
+                    target_price=target_p,
+                )
+            else:
+                st.info("OHLCV data not available for chart.")
+
+        with tab_static:
+            chart_path = st.session_state.get(PREDICT_CHART_PATH)
+            if chart_path and Path(str(chart_path)).exists():
+                st.image(str(chart_path), use_container_width=True)
+            else:
+                st.info("Run a prediction to generate the analysis chart.")
+
     elif prediction is not None and cached_ticker != ticker:
         st.info(f"Showing cached results for **{cached_ticker}**. Run prediction to refresh.")
         prediction_card(prediction)
@@ -73,11 +101,9 @@ def _run_prediction(
     save_report: bool,
 ) -> None:
     try:
-        import yaml
         from src.data_fetcher import DataFetcher
         from src.indicators import TechnicalIndicators
         from src.prediction import SignalScorer
-        from src.prediction.ai_predictor import AIPredictor
         from src.reporting.prediction_chart import PredictionChart
         from src.system import PredictionTradingSystem
 
@@ -85,7 +111,6 @@ def _run_prediction(
             ticker=ticker,
             enable_ai=enable_ai,
         )
-        # Override categories from UI selection
         system.scorer = SignalScorer(
             categories=tuple(categories) if categories else None,
             multi_timeframe_bonus=int(system.cfg.signals.get("multi_timeframe_bonus", 2)),
@@ -105,7 +130,6 @@ def _run_prediction(
 
         market = system.fetch()
 
-        # Optional 4H data
         df_4h = None
         if use_4h:
             try:
@@ -121,7 +145,6 @@ def _run_prediction(
 
         prediction = system.predict(market, hourly_4h=df_4h)
 
-        # Render chart
         tmp_dir = Path(tempfile.mkdtemp())
         chart_path = tmp_dir / f"{ticker}_{timeframe}.png"
         chart = PredictionChart()

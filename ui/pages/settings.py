@@ -23,7 +23,7 @@ def _save(path: Path, data: dict) -> None:
 
 
 def render() -> None:
-    st.title("Settings")
+    st.markdown("## ⚙️ Settings")
 
     cfg = _load(_DEFAULT_CFG)
     profiles = _load(_PROFILES_CFG)

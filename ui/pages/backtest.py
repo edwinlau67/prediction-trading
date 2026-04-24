@@ -5,13 +5,12 @@ from datetime import date
 
 import streamlit as st
 
-from ui.components import equity_chart, metric_card, trade_log_table
+from ui.components import candlestick_chart, equity_chart, metric_card, trade_log_table
 from ui.state import BT_OHLCV, BT_RESULT, BT_TICKER
 
 
 def render() -> None:
-    st.title("Backtest")
-    st.caption("Simulate the trading strategy on historical OHLCV data.")
+    st.markdown("## 📅 Backtest")
 
     # ── Inputs ────────────────────────────────────────────────────────────────
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -28,15 +27,13 @@ def render() -> None:
             "Initial Capital ($)", 1_000.0, 10_000_000.0, 10_000.0, step=1_000.0,
         )
     with col5:
-        commission = st.number_input(
-            "Commission per Trade ($)", 0.0, 100.0, 1.0,
-        )
+        commission = st.number_input("Commission per Trade ($)", 0.0, 100.0, 1.0)
 
-    if st.button("Run Backtest", type="primary", disabled=not ticker):
+    if st.button("▶ Run Backtest", type="primary", disabled=not ticker):
         if end <= start:
             st.error("End date must be after start date.")
         else:
-            with st.spinner(f"Backtesting {ticker} from {start} to {end}..."):
+            with st.spinner(f"Backtesting **{ticker}** from {start} to {end}..."):
                 _run_backtest(ticker, str(start), str(end), capital, commission)
 
     # ── Results ───────────────────────────────────────────────────────────────
@@ -49,13 +46,7 @@ def render() -> None:
         _show_results(result, capital)
 
 
-def _run_backtest(
-    ticker: str,
-    start: str,
-    end: str,
-    capital: float,
-    commission: float,
-) -> None:
+def _run_backtest(ticker, start, end, capital, commission) -> None:
     try:
         from src.system import PredictionTradingSystem
 
@@ -69,65 +60,92 @@ def _run_backtest(
 
     except Exception as exc:
         st.error(f"Backtest failed: {exc}")
-        raise
 
 
 def _show_results(result, initial_capital: float = 10_000.0) -> None:
     st.divider()
-    st.subheader("Backtest Results")
 
     stats = result.summary() if hasattr(result, "summary") else getattr(result, "stats", {})
     portfolio = getattr(result, "portfolio", None)
 
     # KPI row
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        ret = stats.get("return_pct", 0.0)
-        metric_card("Total Return", f"{ret:+.2f}%")
-    with col2:
+    c1, c2, c3, c4 = st.columns(4)
+    ret = stats.get("return_pct", 0.0)
+    sign = "+" if ret >= 0 else ""
+    with c1:
+        metric_card("Total Return", f"{sign}{ret:.2f}%")
+    with c2:
         dd = stats.get("max_drawdown_pct", 0.0)
         metric_card("Max Drawdown", f"{dd:.2f}%")
-    with col3:
+    with c3:
         wr = stats.get("win_rate_pct", 0.0)
         metric_card("Win Rate", f"{wr:.1f}%")
-    with col4:
-        pf = stats.get("profit_factor", None)
+    with c4:
+        pf = stats.get("profit_factor")
         metric_card("Profit Factor", f"{pf:.2f}" if pf else "N/A")
 
-    # Additional stats row
-    col5, col6, col7, col8 = st.columns(4)
-    with col5:
-        metric_card("Total Trades", str(stats.get("total_trades", 0)))
-    with col6:
-        metric_card("Winning Trades", str(stats.get("winning_trades", 0)))
-    with col7:
-        metric_card("Losing Trades", str(stats.get("losing_trades", 0)))
-    with col8:
+    c5, c6, c7, c8 = st.columns(4)
+    with c5:
+        metric_card("Total Trades", str(stats.get("trades", 0)))
+    with c6:
+        metric_card("Avg Win", f"${stats.get('avg_win', 0):+.2f}")
+    with c7:
+        metric_card("Avg Loss", f"${stats.get('avg_loss', 0):+.2f}")
+    with c8:
         if portfolio:
             final_equity = portfolio.equity({})
             metric_card("Final Equity", f"${final_equity:,.2f}")
 
-    # Equity curve
-    if portfolio and portfolio.equity_curve:
-        equity_chart(portfolio.equity_curve, initial_capital, title="Portfolio Equity Curve")
+    # Tabs: equity curve, candlestick with trades, trade log
+    tab_equity, tab_candle, tab_log = st.tabs(
+        ["📈 Equity Curve", "🕯️ Candlestick + Trades", "📋 Trade Log"]
+    )
 
-    # Trade log
-    st.subheader("Trade Log")
-    if portfolio:
-        trade_log_table(portfolio.closed_trades)
+    with tab_equity:
+        if portfolio and portfolio.equity_curve:
+            equity_chart(portfolio.equity_curve, initial_capital)
+        else:
+            st.info("No equity curve data.")
+
+    with tab_candle:
+        ohlcv = st.session_state.get(BT_OHLCV)
+        if ohlcv is not None and portfolio:
+            trades = getattr(portfolio, "closed_trades", [])
+            buys = [
+                (t.entry_time, t.entry_price) for t in trades
+                if getattr(t, "side", "") == "long"
+            ]
+            sells = [
+                (t.exit_time, t.exit_price) for t in trades
+            ]
+            from src.indicators import TechnicalIndicators
+            df = TechnicalIndicators.compute_all(ohlcv)
+            candlestick_chart(
+                df,
+                title=f"{st.session_state.get(BT_TICKER, '')} — Backtest Period",
+                buy_signals=buys or None,
+                sell_signals=sells or None,
+                height=500,
+            )
+        else:
+            st.info("OHLCV data not available.")
+
+    with tab_log:
+        if portfolio:
+            trade_log_table(portfolio.closed_trades)
 
     # Save report
-    ticker = st.session_state.get(BT_TICKER, "")
-    if ticker and st.button("Save Full Report"):
+    ticker_key = st.session_state.get(BT_TICKER, "")
+    if ticker_key and st.button("💾 Save Full Report"):
         try:
             from src.data_fetcher import MarketData
             from src.system import PredictionTradingSystem
 
             ohlcv = st.session_state.get(BT_OHLCV)
-            system = PredictionTradingSystem(ticker=ticker, initial_capital=initial_capital)
+            system = PredictionTradingSystem(ticker=ticker_key, initial_capital=initial_capital)
             if ohlcv is not None:
                 system._market = MarketData(
-                    ticker=ticker, ohlcv=ohlcv,
+                    ticker=ticker_key, ohlcv=ohlcv,
                     current_price=float(ohlcv["Close"].iloc[-1]),
                 )
             out_dir = system.save_report(result=result)
