@@ -64,7 +64,7 @@ class UnifiedPredictor:
         *,
         ai_enabled: bool = False,
         ai_weight: float = 0.5,
-        min_confidence: float = 0.55,
+        min_confidence: float = 0.40,
         timeframe: str = "1w",
     ) -> None:
         self.scorer = scorer or SignalScorer()
@@ -81,9 +81,10 @@ class UnifiedPredictor:
         *,
         current_price: float,
         weekly: pd.DataFrame | None = None,
+        hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
     ) -> Prediction:
-        rule = self.scorer.score(df, weekly=weekly, fundamentals=fundamentals)
+        rule = self.scorer.score(df, weekly=weekly, hourly_4h=hourly_4h, fundamentals=fundamentals)
         ai_pred: AIPrediction | None = None
         factors: list[Factor] = list(rule.factors)
 

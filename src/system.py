@@ -108,7 +108,7 @@ class PredictionTradingSystem:
             ai=self.ai_predictor,
             ai_enabled=bool(self.cfg.ai.get("enabled")) and self.ai_predictor is not None,
             ai_weight=self.cfg.signals.get("ai_weight", 0.5),
-            min_confidence=self.cfg.signals.get("min_confidence", 0.55),
+            min_confidence=self.cfg.signals.get("min_confidence", 0.40),
             timeframe=self.cfg.ai.get("timeframe", "1w"),
         )
 
@@ -119,7 +119,7 @@ class PredictionTradingSystem:
             min_risk_reward=self.cfg.risk.get("min_risk_reward", 1.5),
             stop_loss_atr_mult=self.cfg.risk.get("stop_loss_atr_mult", 2.0),
             take_profit_atr_mult=self.cfg.risk.get("take_profit_atr_mult", 3.0),
-            min_confidence=self.cfg.signals.get("min_confidence", 0.55),
+            min_confidence=self.cfg.signals.get("min_confidence", 0.40),
         )
 
         self.report_writer = ReportWriter(out_root=out_root)
@@ -144,7 +144,8 @@ class PredictionTradingSystem:
         return self._market
 
     # ------------------------------------------------------------ prediction
-    def predict(self, market: MarketData | None = None) -> Prediction:
+    def predict(self, market: MarketData | None = None, *,
+                hourly_4h: "pd.DataFrame | None" = None) -> Prediction:
         mkt = market or self._market or self.fetch()
         df = TechnicalIndicators.compute_all(mkt.ohlcv)
         weekly = self._to_weekly(mkt.ohlcv)
@@ -153,6 +154,7 @@ class PredictionTradingSystem:
             ticker=mkt.ticker, df=df,
             current_price=mkt.current_price,
             weekly=weekly_df,
+            hourly_4h=hourly_4h,
             fundamentals=mkt.fundamentals,
         )
 

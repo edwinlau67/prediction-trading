@@ -80,6 +80,10 @@ def _parse_args() -> argparse.Namespace:
         "--out", default="results",
         help="Root directory for run output (default: results).",
     )
+    ap.add_argument(
+        "--4h", dest="use_4h", action="store_true",
+        help="Fetch 4-hour OHLCV and add confluence bonus when 4H agrees with daily.",
+    )
     return ap.parse_args()
 
 
@@ -113,6 +117,7 @@ def main() -> int:
     print(f"Timeframe : {args.timeframe}")
     print(f"Model     : {args.model if use_ai else '(AI disabled — rule-based only)'}")
     print(f"Indicators: {', '.join(sorted(cats))}")
+    print(f"4H Conflu.: {'enabled' if args.use_4h else 'disabled'}")
     print(f"Tickers   : {', '.join(args.tickers)}\n")
 
     entries: list[PredictionReportEntry] = []
@@ -127,10 +132,24 @@ def main() -> int:
             }).dropna()
             weekly_df = TechnicalIndicators.compute_all(weekly)
 
+            df_4h = None
+            if args.use_4h:
+                try:
+                    fetcher_4h = DataFetcher(interval="1h")
+                    ohlcv_4h = fetcher_4h.fetch_history(ticker.upper(), lookback_days=90)
+                    rules = {"Open": "first", "High": "max", "Low": "min",
+                             "Close": "last", "Volume": "sum"}
+                    ohlcv_4h = ohlcv_4h.resample("4h").agg(rules).dropna()
+                    if not ohlcv_4h.empty:
+                        df_4h = TechnicalIndicators.compute_all(ohlcv_4h)
+                except Exception as exc:
+                    log.warning("4H fetch failed for %s: %s", ticker, exc)
+
             prediction = predictor.predict(
                 ticker=market.ticker, df=df,
                 current_price=market.current_price,
                 weekly=weekly_df,
+                hourly_4h=df_4h,
                 fundamentals=market.fundamentals,
             )
 

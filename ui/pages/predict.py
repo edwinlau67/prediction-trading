@@ -76,7 +76,7 @@ def _run_prediction(
         import yaml
         from src.data_fetcher import DataFetcher
         from src.indicators import TechnicalIndicators
-        from src.prediction import SignalScorer, UnifiedPredictor
+        from src.prediction import SignalScorer
         from src.prediction.ai_predictor import AIPredictor
         from src.reporting.prediction_chart import PredictionChart
         from src.system import PredictionTradingSystem
@@ -104,9 +104,6 @@ def _run_prediction(
         )
 
         market = system.fetch()
-        df_daily = TechnicalIndicators.compute_all(market.ohlcv)
-        weekly = system._to_weekly(market.ohlcv)
-        weekly_df = TechnicalIndicators.compute_all(weekly) if weekly is not None else None
 
         # Optional 4H data
         df_4h = None
@@ -114,7 +111,6 @@ def _run_prediction(
             try:
                 fetcher_4h = DataFetcher(interval="1h")
                 ohlcv_4h = fetcher_4h.fetch_history(ticker, lookback_days=90)
-                # Resample 1h → 4h
                 rules = {"Open": "first", "High": "max", "Low": "min",
                          "Close": "last", "Volume": "sum"}
                 ohlcv_4h = ohlcv_4h.resample("4h").agg(rules).dropna()
@@ -123,16 +119,7 @@ def _run_prediction(
             except Exception as exc:
                 st.warning(f"Could not fetch 4H data: {exc}. Proceeding without it.")
 
-        # Run rule-based scoring with optional 4H
-        rule_signal = system.scorer.score(
-            df_daily,
-            weekly=weekly_df,
-            hourly_4h=df_4h,
-            fundamentals=market.fundamentals,
-        )
-
-        # Full prediction via UnifiedPredictor (handles AI fusion)
-        prediction = system.predict(market)
+        prediction = system.predict(market, hourly_4h=df_4h)
 
         # Render chart
         tmp_dir = Path(tempfile.mkdtemp())
@@ -157,4 +144,3 @@ def _run_prediction(
 
     except Exception as exc:
         st.error(f"Prediction failed: {exc}")
-        raise
