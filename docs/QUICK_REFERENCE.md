@@ -147,10 +147,11 @@ results/
       TICKER_1w.png
   backtest_TICKER_YYYYMMDD_HHMMSS/
     report.md
-    chart_indicators.png
-    chart_signals.png
-    chart_performance.png
-    chart_risk.png
+    charts/
+      indicators.png
+      signals.png
+      performance.png
+      risk.png
   live_YYYYMMDD_HHMMSS/
     portfolio_state.json
     trades.csv
