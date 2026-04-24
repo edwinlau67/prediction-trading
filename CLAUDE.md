@@ -91,7 +91,7 @@ All runs write under `results/` with self-describing prefixes:
 
 ### Tests
 
-All 52 tests across 11 files use synthetic OHLCV fixtures defined in `tests/conftest.py` (`ohlcv_uptrend`, `ohlcv_downtrend`, `ohlcv_sideways`) — no network or API key required.
+All 78 tests across 11 files use synthetic OHLCV fixtures defined in `tests/conftest.py` (`ohlcv_uptrend`, `ohlcv_downtrend`, `ohlcv_sideways`) — no network or API key required.
 
 ### Config
 
