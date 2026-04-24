@@ -36,7 +36,7 @@ python automated_trader.py --tickers AAPL --interval 300 --market-hours
 streamlit run app.py
 
 # Scan watchlist (bulk signal scoring)
-python scan_watchlist.py --tickers AAPL TSLA NVDA
+python scan_watchlist.py AAPL TSLA NVDA
 
 # Run all tests (offline — no API key required)
 pytest tests/ -v
