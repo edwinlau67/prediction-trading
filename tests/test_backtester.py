@@ -1,6 +1,20 @@
-from src.backtest import Backtester
+from datetime import datetime
+
+from src.backtest import Backtester, BacktestResult
 from src.prediction import SignalScorer, UnifiedPredictor
-from src.trading import RiskManager
+from src.trading import Portfolio, RiskManager
+from src.trading.portfolio import Trade
+
+
+def test_profit_factor_none_when_no_losses():
+    p = Portfolio(initial_capital=10_000.0)
+    when = datetime(2024, 1, 2)
+    p.closed_trades = [
+        Trade("A", "long", 10, 100.0, 110.0, when, when, pnl=0.0, reason="eod_flush"),
+    ]
+    result = BacktestResult(ticker="A", start=when, end=when, portfolio=p)
+    s = result.summary()
+    assert s["profit_factor"] is None
 
 
 def test_backtest_runs_end_to_end(ohlcv_uptrend):

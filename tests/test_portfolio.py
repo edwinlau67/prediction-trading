@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 from src.trading.portfolio import Portfolio, Position
 
 
-def _pos(ticker: str, price: float, qty: int, when: datetime) -> Position:
+def _pos(ticker: str, price: float, qty: int, when: datetime, side: str = "long") -> Position:
     return Position(
-        ticker=ticker, side="long", quantity=qty,
+        ticker=ticker, side=side, quantity=qty,
         entry_price=price, entry_time=when,
-        stop_loss=price * 0.95, take_profit=price * 1.1,
+        stop_loss=price * (0.95 if side == "long" else 1.05),
+        take_profit=price * (1.1 if side == "long" else 0.90),
     )
 
 
@@ -38,6 +41,28 @@ def test_equity_tracks_position_value():
     p.open(_pos("AAPL", 100.0, 5, when))
     assert p.equity({"AAPL": 100.0}) == 5_000.0 - 1.0       # only commission
     assert p.equity({"AAPL": 110.0}) == 5_000.0 - 1.0 + 50
+
+
+def test_short_position_profit_close():
+    when = datetime(2024, 1, 2)
+    p = Portfolio(initial_capital=10_000.0, commission_per_trade=1.0)
+    p.open(_pos("TSLA", 100.0, 10, when, side="short"))
+    assert p.cash == 10_000.0 - 100 * 10 - 1.0
+    trade = p.close("TSLA", 90.0, when + timedelta(days=3), reason="take_profit")
+    # short profits when exit < entry: pnl = (100 - 90) * 10 - 2 commissions = 98
+    assert trade.pnl == 10 * (100 - 90) - 2 * 1.0
+    # cash after close should reflect initial + pnl
+    assert p.cash == pytest.approx(10_000.0 + trade.pnl)
+
+
+def test_short_position_equity_mark():
+    when = datetime(2024, 1, 2)
+    p = Portfolio(initial_capital=10_000.0, commission_per_trade=1.0)
+    p.open(_pos("TSLA", 100.0, 10, when, side="short"))
+    # at entry price, equity = initial - commission
+    assert p.equity({"TSLA": 100.0}) == pytest.approx(10_000.0 - 1.0)
+    # at lower price (profit), equity > initial - commission
+    assert p.equity({"TSLA": 90.0}) == pytest.approx(10_000.0 - 1.0 + 100.0)
 
 
 def test_drawdown_calculation():
