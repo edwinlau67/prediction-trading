@@ -28,7 +28,7 @@ prediction-trading/
 │   ├── default.yaml                    # portfolio, risk, signal, trader, AI defaults
 │   ├── risk_profiles.yaml              # conservative / moderate / aggressive presets
 │   └── indicators_config.yaml          # per-indicator period/threshold reference
-├── DESIGN.md                           # architecture and scoring model
+├── DESIGN.md                           # design specification
 ├── docs/
 │   ├── TRADING_SYSTEM_GUIDE.md         # full end-to-end walkthrough
 │   ├── API_REFERENCE.md                # Python API reference
@@ -66,7 +66,7 @@ prediction-trading/
 │   │   └── report.py                   # backtest report.md
 │   └── logger.py
 ├── examples/                           # predict + backtest + live-trading examples
-└── tests/                              # 32 unit + integration tests
+└── tests/                              # 52 unit + integration tests
 ```
 
 ## Web UI
@@ -138,6 +138,16 @@ python stock_predictor.py --tickers MSFT --indicators fundamental
 python stock_predictor.py --tickers NVDA --indicators support
 ```
 
+### 4H timeframe confluence
+
+Pass `--4h` to fetch 1-hour OHLCV, resample to 4H, and add a confluence
+bonus when the 4H direction agrees with the daily signal.
+
+```bash
+python stock_predictor.py --tickers AAPL --4h
+python stock_predictor.py --tickers NVDA MSFT --4h --no-ai
+```
+
 ### Full option list
 
 ```
@@ -145,7 +155,7 @@ usage: stock_predictor.py [-h] [--tickers TICKER [TICKER ...]]
                           [--timeframe {1d,1w,1m,3m,6m,ytd,1y,2y,5y}]
                           [--model MODEL]
                           [--indicators INDICATOR [INDICATOR ...]]
-                          [--no-ai] [--out OUT]
+                          [--no-ai] [--4h] [--out OUT]
 
   --tickers     One or more stock ticker symbols (default: AAPL TSLA INTC)
   --timeframe   Prediction timeframe: 1d 1w 1m 3m 6m ytd 1y 2y 5y (default: 1w)
@@ -153,6 +163,7 @@ usage: stock_predictor.py [-h] [--tickers TICKER [TICKER ...]]
   --indicators  Indicator categories (default: all six)
                 Choices: trend momentum volatility volume support fundamental
   --no-ai            Skip the Claude call; rule-based-only run.
+  --4h               Enable 4H confluence bonus (fetches 1h OHLCV, resamples to 4H).
   --thinking-budget  Token budget for extended thinking (0 = disabled, e.g. 10000).
   --out              Output root directory (default: results/)
 ```
@@ -420,7 +431,7 @@ prefix at ~10% of input token cost (same mechanism as `stock-prediction`).
 
 ```bash
 pytest tests/ -v
-# 32 passed
+# 52 passed
 ```
 
 All tests use synthetic OHLCV fixtures, so they run offline and without
