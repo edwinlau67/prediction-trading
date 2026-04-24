@@ -42,12 +42,12 @@
 │  fetch()  predict()  backtest()  save_report()  build_auto_trader()         │
 └──────┬───────────────────┬──────────────────┬───────────────────────────────┘
        │                   │                  │
-┌──────▼──────────┐  ┌─────▼─────────────┐  ┌▼───────────────────────────────┐
-│  PREDICTION     │  │    TRADING        │  │          BACKTEST              │
-│                 │  │                   │  │                                │
-│ SignalScorer    │  │ Portfolio         │  │ Backtester (bar-by-bar,        │
-│ AIPredictor     │  │ RiskManager       │  │ 200-bar warmup, no look-ahead) │
-│ UnifiedPredictor│  │ AutoTrader        │  └────────────────────────────────┘
+┌──────▼──────────┐  ┌─────▼─────────────┐  ┌─▼───────────────────────────────┐
+│  PREDICTION     │  │    TRADING        │  │          BACKTEST               │
+│                 │  │                   │  │                                 │
+│ SignalScorer    │  │ Portfolio         │  │ Backtester (bar-by-bar,         │
+│ AIPredictor     │  │ RiskManager       │  │ 200-bar warmup, no look-ahead)  │
+│ UnifiedPredictor│  │ AutoTrader        │  └─────────────────────────────────┘
 └──────┬──────────┘  │ PaperBroker       │
        │             │ StateStore        │
 ┌──────▼──────────┐  └───────────────────┘
@@ -63,9 +63,9 @@
        │
 ┌──────▼──────────────────────────────────────────────────────────────────────┐
 │                           INDICATORS & DATA                                 │
-│  TechnicalIndicators (SMA/EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV)        │
-│  SupportResistance (pivots, Fibonacci, swing trendlines)                   │
-│  DataFetcher (yfinance OHLCV + fundamentals)                               │
+│  TechnicalIndicators (SMA/EMA, MACD, RSI, Stoch, BB, ATR, ADX, OBV)         │
+│  SupportResistance (pivots, Fibonacci, swing trendlines)                    │
+│  DataFetcher (yfinance OHLCV + fundamentals)                                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

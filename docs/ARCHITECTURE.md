@@ -9,25 +9,25 @@ The Prediction Trading System is a Python-based platform that combines rule-base
 ## Layer Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     USER INTERFACES                             │
-│  app.py (Streamlit)    stock_predictor.py    automated_trader.py│
-│  scan_watchlist.py                                              │
-└───────────────────────────┬─────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                     USER INTERFACES                              │
+│  app.py (Streamlit)    stock_predictor.py    automated_trader.py │
+│  scan_watchlist.py                                               │
+└───────────────────────────┬──────────────────────────────────────┘
                             │
-┌───────────────────────────▼─────────────────────────────────────┐
+┌───────────────────────────▼──────────────────────────────────────┐
 │                  src/system.py — PredictionTradingSystem         │
 │   (façade: fetch / predict / backtest / save_report /            │
 │    build_auto_trader)                                            │
-└──┬────────────────┬──────────────────┬──────────────────────────┘
-   │                │                  │
-┌──▼──────────┐  ┌──▼──────────────┐  ┌▼──────────────────────────┐
-│ PREDICTION  │  │    TRADING       │  │       BACKTEST             │
-│             │  │                  │  │                            │
-│ SignalScorer│  │ Portfolio         │  │ Backtester                 │
-│ AIPredictor │  │ RiskManager      │  │ (bar-by-bar, 200-bar       │
-│ UnifiedPred.│  │ AutoTrader       │  │  warmup, stops/targets)    │
-└──┬──────────┘  │ PaperBroker      │  └────────────────────────────┘
+└──┬────────────────┬─────────────────────┬────────────────────────┘
+   │                │                     │
+┌──▼──────────┐  ┌──▼───────────────┐  ┌──▼────────────────────────┐
+│ PREDICTION  │  │    TRADING       │  │       BACKTEST            │
+│             │  │                  │  │                           │
+│ SignalScorer│  │ Portfolio        │  │ Backtester                │
+│ AIPredictor │  │ RiskManager      │  │ (bar-by-bar, 200-bar      │
+│ UnifiedPred.│  │ AutoTrader       │  │  warmup, stops/targets)   │
+└──┬──────────┘  │ PaperBroker      │  └───────────────────────────┘
    │             │ StateStore       │
 ┌──▼──────────┐  └──────────────────┘
 │  INDICATORS │
@@ -36,11 +36,11 @@ The Prediction Trading System is a Python-based platform that combines rule-base
 │ SupportRes. │
 └─────────────┘
         │
-┌───────▼────────────────────────────────────────────────────────┐
-│                     REPORTING                                   │
-│  PredictionChart   PredictionReportWriter   ChartBuilder        │
-│  results/predict_*/  results/backtest_*/  results/live_*/       │
-└────────────────────────────────────────────────────────────────┘
+┌───────▼──────────────────────────────────────────────────────────┐
+│                     REPORTING                                    │
+│  PredictionChart   PredictionReportWriter   ChartBuilder         │
+│  results/predict_*/  results/backtest_*/  results/live_*/        │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
