@@ -88,7 +88,7 @@ class RiskManager:
             return None
 
         equity = portfolio.equity_curve[-1][1] if portfolio.equity_curve \
-            else portfolio.initial_capital
+            else portfolio.equity({})
         max_notional = equity * self.max_position_size_pct
         quantity = int(max_notional // price)
         if quantity <= 0:
@@ -117,7 +117,7 @@ class RiskManager:
         key = when.strftime("%Y-%m-%d")
         if key not in self._day_start_equity:
             start = portfolio.equity_curve[-1][1] if portfolio.equity_curve \
-                else portfolio.initial_capital
+                else portfolio.equity({})
             self._day_start_equity[key] = start
         start = self._day_start_equity[key]
         current = portfolio.equity_curve[-1][1] if portfolio.equity_curve else start

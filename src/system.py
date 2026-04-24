@@ -126,6 +126,7 @@ class PredictionTradingSystem:
         self.chart_builder = ChartBuilder()
 
         self._market: MarketData | None = None
+        self._weekly_cache: dict[str, pd.DataFrame] = {}  # ticker -> weekly df
 
     # ------------------------------------------------------------------ data
     def fetch(self, *, lookback_days: int | None = None,
@@ -148,8 +149,13 @@ class PredictionTradingSystem:
                 hourly_4h: "pd.DataFrame | None" = None) -> Prediction:
         mkt = market or self._market or self.fetch()
         df = TechnicalIndicators.compute_all(mkt.ohlcv)
-        weekly = self._to_weekly(mkt.ohlcv)
-        weekly_df = TechnicalIndicators.compute_all(weekly) if weekly is not None else None
+        cache_key = f"{mkt.ticker}:{len(mkt.ohlcv)}"
+        if cache_key not in self._weekly_cache:
+            raw_weekly = self._to_weekly(mkt.ohlcv)
+            self._weekly_cache[cache_key] = (
+                TechnicalIndicators.compute_all(raw_weekly) if raw_weekly is not None else None
+            )
+        weekly_df = self._weekly_cache[cache_key]
         return self.predictor.predict(
             ticker=mkt.ticker, df=df,
             current_price=mkt.current_price,

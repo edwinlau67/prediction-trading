@@ -135,7 +135,6 @@ class Backtester:
         final_price = float(enriched["Close"].iloc[-1])
         if ticker in portfolio.positions:
             portfolio.close(ticker, final_price, final_ts, reason="eod_flush")
-            portfolio.mark(final_ts, {ticker: final_price})
 
         result = BacktestResult(
             ticker=ticker, start=start, end=end, portfolio=portfolio

@@ -74,6 +74,19 @@ class DataFetcher:
             df.columns = df.columns.get_level_values(0)
         df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
         df.index = pd.to_datetime(df.index)
+        # Drop bars where OHLC constraints are violated (data quality guard)
+        valid = (
+            (df["High"] >= df["Open"]) & (df["High"] >= df["Close"]) &
+            (df["Low"] <= df["Open"]) & (df["Low"] <= df["Close"]) &
+            (df["High"] >= df["Low"])
+        )
+        n_bad = (~valid).sum()
+        if n_bad > 0:
+            import logging
+            logging.getLogger("prediction_trading.data_fetcher").warning(
+                "Dropped %d bar(s) with invalid OHLC for %s", n_bad, ticker
+            )
+            df = df[valid]
         return df
 
     def fetch_fundamentals(self, ticker: str) -> dict[str, Any]:

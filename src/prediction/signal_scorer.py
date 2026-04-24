@@ -103,6 +103,11 @@ class SignalScorer:
         if df.empty:
             return ScoredSignal(direction="neutral", confidence=0.0)
 
+        # Pre-compute common slices once to avoid repeated .iloc[-1] calls
+        self._last_row = df.iloc[-1]
+        self._prev_row = df.iloc[-2] if len(df) >= 2 else df.iloc[-1]
+        self._tail20 = df.tail(20)
+
         factors: list[Factor] = []
 
         if "trend" in self.categories:
@@ -182,8 +187,8 @@ class SignalScorer:
 
     # ----------------------------------------------------------- trend rules
     def _trend_factors(self, df: pd.DataFrame) -> list[Factor]:
-        row = df.iloc[-1]
-        prev = df.iloc[-2] if len(df) >= 2 else row
+        row = getattr(self, "_last_row", df.iloc[-1])
+        prev = getattr(self, "_prev_row", df.iloc[-2] if len(df) >= 2 else row)
         close = self._v(row["Close"])
         sma50 = self._v(row.get("SMA50"))
         sma200 = self._v(row.get("SMA200"))
@@ -245,8 +250,8 @@ class SignalScorer:
 
     # --------------------------------------------------------- momentum rules
     def _momentum_factors(self, df: pd.DataFrame) -> list[Factor]:
-        row = df.iloc[-1]
-        prev = df.iloc[-2] if len(df) >= 2 else row
+        row = getattr(self, "_last_row", df.iloc[-1])
+        prev = getattr(self, "_prev_row", df.iloc[-2] if len(df) >= 2 else row)
         facs: list[Factor] = []
 
         rsi = self._v(row.get("RSI"))
@@ -286,7 +291,7 @@ class SignalScorer:
 
     # ------------------------------------------------------ volatility rules
     def _volatility_factors(self, df: pd.DataFrame) -> list[Factor]:
-        row = df.iloc[-1]
+        row = getattr(self, "_last_row", df.iloc[-1])
         facs: list[Factor] = []
         close = self._v(row["Close"])
         upper = self._v(row.get("BB_upper"))
@@ -300,8 +305,9 @@ class SignalScorer:
                                f"${close:.2f} ≤ ${lower:.2f}"))
 
         atr = self._v(row.get("ATR"))
-        atr_series = df["ATR"].dropna() if "ATR" in df.columns else pd.Series(dtype=float)
-        atr_mean = float(atr_series.tail(20).mean() or 0.0)
+        tail20 = getattr(self, "_tail20", df.tail(20))
+        atr_series = tail20["ATR"].dropna() if "ATR" in tail20.columns else pd.Series(dtype=float)
+        atr_mean = float(atr_series.mean() or 0.0)
         if atr and atr_mean:
             ratio = atr / atr_mean
             if ratio > 1.3:
@@ -317,8 +323,9 @@ class SignalScorer:
     # ---------------------------------------------------------- volume rules
     def _volume_factors(self, df: pd.DataFrame) -> list[Factor]:
         facs: list[Factor] = []
+        tail20 = getattr(self, "_tail20", df.tail(20))
         if "OBV" in df and df["OBV"].notna().any():
-            obv_tail = df["OBV"].tail(20)
+            obv_tail = tail20["OBV"]
             if obv_tail.iloc[-1] > obv_tail.iloc[0]:
                 facs.append(Factor("volume", "OBV rising", "bullish", 1,
                                    "on-balance volume trending up"))
@@ -342,10 +349,12 @@ class SignalScorer:
         from ..indicators.levels import SupportResistance
 
         facs: list[Factor] = []
-        row = df.iloc[-1]
+        row = getattr(self, "_last_row", df.iloc[-1])
         close = self._v(row["Close"])
+        # Classical pivot uses prior-day OHLC per DESIGN.md §4.3
+        prior = df.iloc[-2] if len(df) >= 2 else row
         piv = SupportResistance.pivot_points(
-            float(row["High"]), float(row["Low"]), close,
+            float(prior["High"]), float(prior["Low"]), float(prior["Close"]),
         )
         if close > piv.pp:
             facs.append(Factor("support", "Price above Pivot", "bullish", 1,

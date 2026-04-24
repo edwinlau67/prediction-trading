@@ -50,6 +50,7 @@ class TechnicalIndicators:
         lowest = low.rolling(window=k_period, min_periods=k_period).min()
         highest = high.rolling(window=k_period, min_periods=k_period).max()
         k = 100.0 * (close - lowest) / (highest - lowest).replace(0.0, np.nan)
+        k = k.fillna(50.0)
         d = k.rolling(window=d_period, min_periods=d_period).mean()
         return k, d
 

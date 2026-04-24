@@ -340,7 +340,8 @@ class AutoTrader:
         for ticker in set(list(self.tickers) + list(self.portfolio.positions.keys())):
             try:
                 prices[ticker] = self.broker.get_quote(ticker)
-            except Exception:
+            except Exception as exc:
+                self.log.warning("Quote fetch failed for %s: %s", ticker, exc)
                 continue
         return prices
 
