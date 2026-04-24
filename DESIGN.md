@@ -411,7 +411,7 @@ for each ticker:
 
 **`CycleReport` fields:** `started_at`, `finished_at`, `actions: list[TickerAction]`, `equity`, `cash`, `errors`.
 
-**`TickerAction` fields:** `ticker`, `action`, `direction`, `confidence`, `price`, `quantity`, `pnl`, `detail`.
+**`TickerAction` fields:** `ticker`, `timestamp`, `action`, `reason`, `direction`, `confidence`, `price`, `quantity`, `pnl`, `stop_loss`, `take_profit`.
 
 ---
 

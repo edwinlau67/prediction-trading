@@ -405,10 +405,16 @@ class Portfolio:
 @dataclass
 class TickerAction:
     ticker: str
-    action: str      # "open", "close", "skip", "error"
-    direction: str
-    confidence: float
-    detail: str
+    timestamp: datetime
+    action: str              # "open" | "close" | "hold" | "skip" | "error"
+    reason: str = ""
+    direction: str | None = None
+    confidence: float | None = None
+    price: float | None = None
+    quantity: int | None = None
+    pnl: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 @dataclass
 class CycleReport:
