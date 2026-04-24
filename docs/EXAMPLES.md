@@ -237,11 +237,10 @@ trader = system.build_auto_trader(
 )
 
 print("Running cycle 1...")
-reports = trader.run(once=True)
-for report in reports:
-    print(f"Cycle finished at {report.finished_at}")
-    for action in report.actions:
-        print(f"  {action.ticker}: {action.action} — {action.detail}")
+report = trader.run_once()
+print(f"Cycle finished at {report.finished_at}")
+for action in report.actions:
+    print(f"  {action.ticker}: {action.action} — {action.reason}")
 
 # ── Restore from state ─────────────────────────────────────────────────────────
 print("\nRestoring portfolio from state file...")
@@ -262,7 +261,7 @@ trader2 = system2.build_auto_trader(
 )
 
 print("\nRunning cycle 2...")
-reports2 = trader2.run(once=True)
+report2 = trader2.run_once()
 print(f"After cycle 2 — Equity: ${trader2.portfolio.equity({}):.2f}")
 ```
 
