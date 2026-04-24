@@ -200,7 +200,7 @@ class UnifiedPredictor:
         ai: AIPredictor | None = None,
         ai_enabled: bool = False,
         ai_weight: float = 0.5,       # 0=rule-only, 1=AI-only
-        min_confidence: float = 0.55,
+        min_confidence: float = 0.40,
         timeframe: str = "1w",
     ) -> None
 
@@ -211,6 +211,7 @@ class UnifiedPredictor:
         *,
         current_price: float,
         weekly: pd.DataFrame | None = None,
+        hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
     ) -> Prediction
 ```
@@ -324,7 +325,7 @@ class RiskManager:
         min_risk_reward: float = 1.5,
         stop_loss_atr_mult: float = 2.0,
         take_profit_atr_mult: float = 3.0,
-        min_confidence: float = 0.55,
+        min_confidence: float = 0.40,
     ) -> None
 
     def evaluate(
@@ -414,14 +415,21 @@ class CycleReport:
     errors: list[str]
 
 class AutoTrader:
+    def run_once(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> CycleReport
+        # Execute one full cycle across all tickers. Returns a single CycleReport.
+
     def run(
         self,
         *,
-        once: bool = False,
-        cycles: int | None = None,
+        interval_seconds: int = 300,
+        max_cycles: int | None = None,
     ) -> list[CycleReport]
-        # Blocking loop. Runs once if once=True, up to cycles times if set,
-        # or indefinitely. Use in a daemon thread from the UI.
+        # Blocking loop: calls run_once(), sleeps interval_seconds, repeats until
+        # max_cycles is reached or the process is interrupted. Use in a daemon thread.
 ```
 
 ---
