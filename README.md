@@ -1,4 +1,4 @@
-# Stock Market Prediction & Automated Trading System
+# Stock Market Prediction Trading System
 
 > AI-powered stock prediction and paper trading system built on technical indicators, Claude AI, and a full end-to-end trading engine.
 

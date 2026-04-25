@@ -1,4 +1,4 @@
-# Design Specification — Stock Market Prediction & Automated Trading System
+# Design Specification — Stock Market Prediction Trading System
 
 | Field | Value |
 |---|---|
@@ -10,7 +10,7 @@
 
 ## 1. Purpose and Scope
 
-Stock Market Prediction & Automated Trading System is an end-to-end platform that combines rule-based technical analysis, AI-assisted prediction via Claude, automated paper/live trading, bar-by-bar backtesting, and an interactive Streamlit web UI. It is designed for educational use and individual research.
+Stock Market Prediction Trading System is an end-to-end platform that combines rule-based technical analysis, AI-assisted prediction via Claude, automated paper/live trading, bar-by-bar backtesting, and an interactive Streamlit web UI. It is designed for educational use and individual research.
 
 **In scope:** signal generation, position management, paper and live brokerage abstraction, backtesting, reporting, web UI.
 
