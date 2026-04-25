@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """Automated trading CLI — prediction-driven live/paper trading.
 
-Wires the same prediction + risk engine used by ``stock_predictor.py`` and
+Wires the same prediction + risk engine used by ``stock-predictor`` and
 the backtester into a scheduled trade loop. Paper trading is the default
 so it is safe to run without a broker account.
 
 Usage
 -----
     # Single cycle, dry-run (no orders submitted), using defaults
-    python automated_trader.py --tickers AAPL TSLA --dry-run --once
+    automated-trader --tickers AAPL TSLA --dry-run --once
 
     # Paper-trade every 5 minutes, persist state, log trades
-    python automated_trader.py --tickers AAPL MSFT NVDA --interval 300
+    automated-trader --tickers AAPL MSFT NVDA --interval 300
 
     # Enforce US equities market hours and use Claude-fused predictions
-    ANTHROPIC_API_KEY=sk-ant-... python automated_trader.py \\
-        --tickers AAPL --ai --market-hours
+    ANTHROPIC_API_KEY=sk-ant-... automated-trader --tickers AAPL --ai --market-hours
 """
 from __future__ import annotations
 
@@ -29,10 +28,8 @@ try:
 except Exception:
     pass
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from src import PredictionTradingSystem  # noqa: E402
-from src.reporting.base import BaseReportWriter  # noqa: E402
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.reporting.base import BaseReportWriter
 
 
 def _parse_args() -> argparse.Namespace:
@@ -92,7 +89,7 @@ def _make_run_dir(out_root: str, run_name: str | None) -> Path:
     return writer.new_run_dir()
 
 
-def main() -> int:
+def main() -> None:
     args = _parse_args()
     run_dir = _make_run_dir(args.out, args.run_name)
 
@@ -131,11 +128,10 @@ def main() -> int:
                 _print_cycle(i, rep)
     except KeyboardInterrupt:
         print("\nStopping (Ctrl-C). State saved to", run_dir / "portfolio_state.json")
-        return 0
+        sys.exit(0)
 
     print(f"\nTrade log  : {run_dir / 'trades.csv'}")
     print(f"State file : {run_dir / 'portfolio_state.json'}")
-    return 0
 
 
 def _print_cycle(index: int, report) -> None:
@@ -161,4 +157,4 @@ def _print_cycle(index: int, report) -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

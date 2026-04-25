@@ -1,52 +1,43 @@
-# Default configuration for prediction-trading.
-# Values here can be overridden by passing kwargs into PredictionTradingSystem.
-
 portfolio:
   initial_capital: 10000.0
   max_positions: 5
-  max_position_size_pct: 0.05      # fraction of equity per position
-  commission_per_trade: 1.0        # flat fee per fill
-  risk_profile: moderate           # conservative | moderate | aggressive | custom
-
+  max_position_size_pct: 0.05
+  commission_per_trade: 1.0
+  risk_profile: moderate
 risk:
-  max_daily_loss_pct: 0.02         # halt new trades if daily loss >= 2%
-  min_risk_reward: 1.5             # minimum R:R on every signal
-  stop_loss_atr_mult: 2.0          # stop = entry -/+ ATR * mult
-  take_profit_atr_mult: 3.0        # target = entry +/- ATR * mult
-
+  max_daily_loss_pct: 0.02
+  min_risk_reward: 1.5
+  stop_loss_atr_mult: 2.0
+  take_profit_atr_mult: 3.0
 signals:
-  min_confidence: 0.40             # minimum combined confidence to act (0..1)
-  confidence_scale: 10.0           # abs(net points) needed to reach 1.0 confidence
-  weights:                         # (legacy) component weights — used by backtester fallback
+  min_confidence: 0.4
+  confidence_scale: 10.0
+  weights:
     trend: 0.25
     momentum: 0.25
-    reversal: 0.20
+    reversal: 0.2
     volatility: 0.15
     price_action: 0.15
-  multi_timeframe_bonus: 2         # extra points when weekly agrees with daily
-  ai_weight: 0.50                  # weight of AI predictor in fused score (0..1)
-
+  multi_timeframe_bonus: 2
+  ai_weight: 0.5
 indicators:
-  categories:                      # active indicator groups
-    - trend
-    - momentum
-    - volatility
-    - volume
-    - support
-    - fundamental
-
+  categories:
+  - trend
+  - momentum
+  - volatility
+  - volume
+  - support
+  - fundamental
 ai:
-  enabled: false                   # set true to fuse Claude predictions
-  model: claude-sonnet-4-6
-  timeframe: 1w                    # prediction window (1d,1w,1m,3m,6m,ytd,1y,2y,5y)
+  enabled: true
+  model: claude-opus-4-7
+  timeframe: 1m
   max_tokens: 2000
-
 data:
-  lookback_days: 365               # history for indicators
+  lookback_days: 365
   interval: 1d
-
-trader:                            # automated (live / paper) trading
-  interval_seconds: 300            # seconds between cycles for AutoTrader.run()
-  enforce_market_hours: false      # gate to US equities 09:30–16:00 ET, Mon–Fri
-  slippage_bps: 5.0                # simulated slippage for PaperBroker (basis pts)
-  dry_run: false                   # emit signals but never submit orders
+trader:
+  interval_seconds: 300
+  enforce_market_hours: false
+  slippage_bps: 5.0
+  dry_run: false

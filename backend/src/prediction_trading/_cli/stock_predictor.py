@@ -7,18 +7,17 @@ and writes a ``predictions.md`` plus per-ticker chart PNGs into
 
 Usage
 -----
-    python stock_predictor.py
-    python stock_predictor.py --tickers AAPL TSLA NVDA
-    python stock_predictor.py --tickers MSFT --timeframe 3m
-    python stock_predictor.py --tickers NVDA --indicators trend momentum
-    ANTHROPIC_API_KEY=sk-ant-... python stock_predictor.py --tickers AAPL --model claude-opus-4-7
+    stock-predictor
+    stock-predictor --tickers AAPL TSLA NVDA
+    stock-predictor --tickers MSFT --timeframe 3m
+    stock-predictor --tickers NVDA --indicators trend momentum
+    ANTHROPIC_API_KEY=sk-ant-... stock-predictor --tickers AAPL --model claude-opus-4-7
 """
 from __future__ import annotations
 
 import argparse
 import os
 import sys
-from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -26,15 +25,13 @@ try:
 except Exception:
     pass
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from src.data_fetcher import DataFetcher  # noqa: E402
-from src.indicators import TechnicalIndicators  # noqa: E402
-from src.logger import get_logger  # noqa: E402
-from src.prediction import (  # noqa: E402
+from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.indicators import TechnicalIndicators
+from prediction_trading.logger import get_logger
+from prediction_trading.prediction import (
     ALL_CATEGORIES, AIPredictor, SignalScorer, UnifiedPredictor,
 )
-from src.reporting import (  # noqa: E402
+from prediction_trading.reporting import (
     PredictionChart, PredictionReportEntry, PredictionReportWriter,
 )
 
@@ -87,7 +84,7 @@ def _parse_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
-def main() -> int:
+def main() -> None:
     args = _parse_args()
     log = get_logger()
     cats = tuple(args.indicators)
@@ -178,14 +175,13 @@ def main() -> int:
 
     if not entries:
         print("\nNo predictions succeeded.")
-        return 1
+        sys.exit(1)
 
     report = writer.write(run_dir, entries, model=args.model if use_ai else None,
                           categories=cats)
     print(f"\nReport: {report}")
     print(f"Charts: {run_dir / 'charts'}/")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

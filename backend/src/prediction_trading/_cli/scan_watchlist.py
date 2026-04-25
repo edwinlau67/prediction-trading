@@ -6,20 +6,17 @@ No API key required.
 
 Usage
 -----
-    python scan_watchlist.py AAPL TSLA NVDA MSFT
-    python scan_watchlist.py AAPL TSLA --min-confidence 0.4
-    python scan_watchlist.py AAPL TSLA --indicators trend momentum
+    scan-watchlist AAPL TSLA NVDA MSFT
+    scan-watchlist AAPL TSLA --min-confidence 0.4
+    scan-watchlist AAPL TSLA --indicators trend momentum
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from src.prediction.factor import ALL_CATEGORIES  # noqa: E402
-from src.scanner import WatchlistScanner  # noqa: E402
+from prediction_trading.prediction.factor import ALL_CATEGORIES
+from prediction_trading.scanner import WatchlistScanner
 
 
 BULL = "\033[32m"
@@ -55,7 +52,7 @@ def _parse_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
-def main() -> int:
+def main() -> None:
     args = _parse_args()
     cats = tuple(args.indicators)
 
@@ -70,7 +67,7 @@ def main() -> int:
 
     if not results:
         print("No results meet the confidence threshold.")
-        return 0
+        sys.exit(0)
 
     col_w = [8, 10, 12, 10, 50]
     header = (
@@ -96,8 +93,7 @@ def main() -> int:
         print(_color(r.direction, row))
 
     print()
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

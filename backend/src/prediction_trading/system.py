@@ -32,7 +32,12 @@ from .trading import (
 )
 
 
-DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "default.yaml"
+_env_cfg = os.environ.get("PREDICTION_TRADING_CONFIG")
+DEFAULT_CONFIG = (
+    Path(_env_cfg)
+    if _env_cfg
+    else Path(__file__).resolve().parent.parent.parent.parent / "config" / "default.yaml"
+)
 
 
 @dataclass
