@@ -7,9 +7,11 @@ from typing import Literal
 Direction = Literal["bullish", "bearish", "neutral"]
 IndicatorCategory = Literal[
     "trend", "momentum", "volatility", "volume", "support", "fundamental",
+    "news", "macro", "sector",
 ]
 ALL_CATEGORIES: tuple[IndicatorCategory, ...] = (
     "trend", "momentum", "volatility", "volume", "support", "fundamental",
+    "news", "macro", "sector",
 )
 
 
