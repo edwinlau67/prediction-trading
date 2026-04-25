@@ -1,16 +1,16 @@
-# Design Specification — prediction-trading
+# Design Specification — Stock Market Prediction & Automated Trading System
 
 | Field | Value |
 |---|---|
-| Version | 1.3 |
+| Version | 1.4 |
 | Status | Active |
-| Last updated | 2026-04-24 |
+| Last updated | 2026-04-25 |
 
 ---
 
 ## 1. Purpose and Scope
 
-`prediction-trading` is an end-to-end platform that combines rule-based technical analysis, AI-assisted prediction via Claude, automated paper/live trading, bar-by-bar backtesting, and an interactive Streamlit web UI. It is designed for educational use and individual research.
+Stock Market Prediction & Automated Trading System is an end-to-end platform that combines rule-based technical analysis, AI-assisted prediction via Claude, automated paper/live trading, bar-by-bar backtesting, and an interactive Streamlit web UI. It is designed for educational use and individual research.
 
 **In scope:** signal generation, position management, paper and live brokerage abstraction, backtesting, reporting, web UI.
 
@@ -30,15 +30,47 @@
 
 ## 3. Architecture Overview
 
+### Monorepo layout
+
+```
+prediction-trading/           ← uv workspace root (pyproject.toml)
+├── backend/                  ← package: prediction-trading-backend
+│   ├── src/prediction_trading/
+│   │   ├── api/              ← FastAPI REST layer
+│   │   ├── _cli/             ← CLI entry points (stock-predictor, …)
+│   │   ├── prediction/
+│   │   ├── trading/
+│   │   ├── backtest/
+│   │   ├── indicators/
+│   │   ├── reporting/
+│   │   ├── data_fetcher.py
+│   │   ├── scanner.py
+│   │   └── system.py
+│   └── tests/
+├── frontend/                 ← package: prediction-trading-frontend
+│   ├── app.py                ← Streamlit entry point
+│   └── ui/                   ← pages, components, theme, watchlist
+├── config/
+├── examples/
+└── Makefile
+```
+
+### Component diagram
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             USER INTERFACES                                 │
-│  app.py (Streamlit UI)   stock_predictor.py   automated_trader.py           │
-│  scan_watchlist.py       examples/                                          │
+│  frontend/app.py (Streamlit)   stock-predictor   automated-trader           │
+│  scan-watchlist                examples/                                    │
+└──────────────┬──────────────────────────┬──────────────────────────────────┘
+               │                          │
+┌──────────────▼──────────────────────────▼──────────────────────────────────┐
+│              REST API  (prediction_trading.api — FastAPI :8000)             │
+│  POST /predict/   POST /scan/   POST /backtest/   GET+POST /trading/…       │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │
 ┌────────────────────────────────▼────────────────────────────────────────────┐
-│                      src/system.py — PredictionTradingSystem                │
+│            prediction_trading/system.py — PredictionTradingSystem           │
 │  fetch()  predict()  backtest()  save_report()  build_auto_trader()         │
 └──────┬───────────────────┬──────────────────┬───────────────────────────────┘
        │                   │                  │
@@ -71,13 +103,13 @@
 
 ### Primary entry point
 
-`src/system.py:PredictionTradingSystem` is the single façade for all Python API usage. CLI entrypoints and UI pages construct it and call its methods. Direct use of sub-modules is permitted but not required.
+`prediction_trading/system.py:PredictionTradingSystem` is the single façade for all Python API usage. The REST API routers, CLI entry points, and UI pages construct it and call its methods. Direct use of sub-modules is permitted but not required.
 
 ---
 
 ## 4. Component Specifications
 
-### 4.1 DataFetcher (`src/data_fetcher.py`)
+### 4.1 DataFetcher (`prediction_trading/data_fetcher.py`)
 
 **Responsibility:** Fetch OHLCV history and fundamentals from Yahoo Finance.
 
@@ -99,7 +131,7 @@ DataFetcher(interval: str = "1d")
 
 ---
 
-### 4.2 TechnicalIndicators (`src/indicators/technical.py`)
+### 4.2 TechnicalIndicators (`prediction_trading/indicators/technical.py`)
 
 **Responsibility:** Stateless pandas/numpy indicator calculations. No external dependencies.
 
@@ -122,7 +154,7 @@ All methods accept `pd.Series` (or `pd.DataFrame` for `compute_all`) and return 
 
 ---
 
-### 4.3 SupportResistance (`src/indicators/levels.py`)
+### 4.3 SupportResistance (`prediction_trading/indicators/levels.py`)
 
 **Responsibility:** Compute classic support/resistance levels.
 
@@ -134,7 +166,7 @@ All methods accept `pd.Series` (or `pd.DataFrame` for `compute_all`) and return 
 
 ---
 
-### 4.4 SignalScorer (`src/prediction/signal_scorer.py`)
+### 4.4 SignalScorer (`prediction_trading/prediction/signal_scorer.py`)
 
 **Responsibility:** Emit `Factor` objects for each active indicator rule and compute a net direction + confidence.
 
@@ -193,7 +225,7 @@ SignalScorer(
 
 ---
 
-### 4.5 AIPredictor (`src/prediction/ai_predictor.py`)
+### 4.5 AIPredictor (`prediction_trading/prediction/ai_predictor.py`)
 
 **Responsibility:** Call the Anthropic Messages API using Claude tool-use and return an `AIPrediction`.
 
@@ -223,7 +255,7 @@ AIPredictor ──► Anthropic Messages API
 
 ---
 
-### 4.6 UnifiedPredictor (`src/prediction/predictor.py`)
+### 4.6 UnifiedPredictor (`prediction_trading/prediction/predictor.py`)
 
 **Responsibility:** Fuse the rule-based signal and optional AI prediction into a single `Prediction`.
 
@@ -294,7 +326,7 @@ All six categories are active by default: `trend`, `momentum`, `volatility`, `vo
 
 ---
 
-### 4.9 Portfolio (`src/trading/portfolio.py`)
+### 4.9 Portfolio (`prediction_trading/trading/portfolio.py`)
 
 **Responsibility:** Track cash, open positions, closed trades, and the equity curve.
 
@@ -321,7 +353,7 @@ This is algebraically equivalent to `cash + Σ (px × qty)` for longs and `cash 
 
 ---
 
-### 4.10 RiskManager (`src/trading/risk_manager.py`)
+### 4.10 RiskManager (`prediction_trading/trading/risk_manager.py`)
 
 **Responsibility:** Gate every trade signal through eight sequential checks and size the position.
 
@@ -369,7 +401,7 @@ quantity      = int(max_notional // price)
 
 ---
 
-### 4.11 Broker Abstraction (`src/trading/broker.py`)
+### 4.11 Broker Abstraction (`prediction_trading/trading/broker.py`)
 
 **`BaseBroker` interface:**
 
@@ -389,7 +421,7 @@ Real brokers (Alpaca, IBKR, etc.) implement `BaseBroker`.
 
 ---
 
-### 4.12 AutoTrader (`src/trading/auto_trader.py`)
+### 4.12 AutoTrader (`prediction_trading/trading/auto_trader.py`)
 
 **Responsibility:** Orchestrate repeated prediction → risk gate → order cycles.
 
@@ -415,7 +447,7 @@ for each ticker:
 
 ---
 
-### 4.13 Backtester (`src/backtest/backtester.py`)
+### 4.13 Backtester (`prediction_trading/backtest/backtester.py`)
 
 **Responsibility:** Replay a price series bar-by-bar using the live prediction and risk pipeline.
 
@@ -440,7 +472,7 @@ for each ticker:
 
 ---
 
-### 4.14 StateStore (`src/trading/state.py`)
+### 4.14 StateStore (`prediction_trading/trading/state.py`)
 
 **Responsibility:** Persist and restore `Portfolio` state across restarts.
 
@@ -450,7 +482,7 @@ for each ticker:
 
 ---
 
-### 4.15 WatchlistScanner (`src/scanner.py`)
+### 4.15 WatchlistScanner (`prediction_trading/scanner.py`)
 
 **Responsibility:** Screen multiple tickers in parallel with the rule-based engine only (no AI, no charting).
 
@@ -474,13 +506,50 @@ Errors in individual tickers are caught and returned as `ScanResult(error=str(ex
 
 ---
 
-## 5. Streamlit Web UI (`app.py`, `ui/`)
+### 4.16 REST API (`prediction_trading/api/`)
 
-Entry point: `streamlit run app.py` (default port 8501). Seven pages via a **top navigation bar** (sidebar nav was replaced). A light/dark theme toggle lives in the header. A **persistent watchlist sidebar** (`ui/watchlist.py`) shows live price badges and quick-links into the Predict page; it is rendered on every page via `render_sidebar()`.
+**Responsibility:** Thin FastAPI layer that exposes the core engine over HTTP. All business logic stays in `PredictionTradingSystem` and its dependencies; routers only handle request parsing and error mapping.
+
+**Entry point:** `prediction_trading/api/main.py:app` — launched via `make api-dev` (uvicorn on `:8000`).
+
+**Routers:**
+
+| Router | Module | Path prefix | Methods | Delegates to |
+|---|---|---|---|---|
+| predict | `routers/predict.py` | `/predict` | `POST /` | `PredictionTradingSystem.predict()` |
+| scan | `routers/scan.py` | `/scan` | `POST /` | `WatchlistScanner.scan()` |
+| backtest | `routers/backtest.py` | `/backtest` | `POST /` | `PredictionTradingSystem.backtest()` |
+| trading | `routers/trading.py` | `/trading` | `GET /status`, `POST /start` | `AutoTrader` |
+
+**Health check:** `GET /health` → `{"status": "ok"}`.
+
+**Schemas** (`api/schemas.py`, Pydantic v2):
+
+| Schema | Direction | Key fields |
+|---|---|---|
+| `PredictRequest` | in | `ticker`, `timeframe`, `enable_ai`, `lookback_days`, `categories`, `use_4h` |
+| `PredictResponse` | out | `ticker`, `direction`, `confidence`, `current_price`, `price_target`, `factors: list[FactorResponse]`, `meta` |
+| `ScanRequest` | in | `tickers`, `categories`, `min_confidence`, `workers` |
+| `ScanResponse` | out | `results: list[ScanResultResponse]`, `total` |
+| `BacktestRequest` | in | `ticker`, `start`, `end`, `initial_capital`, `commission` |
+| `BacktestResponse` | out | `stats: BacktestStatsResponse` |
+| `TradingStartRequest` | in | `tickers`, `initial_capital`, `dry_run`, `enforce_market_hours` |
+| `TradingStatusResponse` | out | `running`, `tickers`, `equity`, `cash`, `open_positions` |
+
+**Configuration:** `api/deps.py:get_default_config()` loads `config/default.yaml` at startup via the lifespan hook.
+
+---
+
+## 5. Streamlit Web UI (`frontend/app.py`, `frontend/ui/`)
+
+Entry point: `frontend/app.py` — launched via `make ui-dev` (`streamlit run frontend/app.py`, default port 8501). `frontend/` is a separate uv workspace package (`prediction-trading-frontend`) that lists `prediction-trading-backend` as a dependency.
+
+Seven pages via a **top navigation bar** (sidebar nav was replaced). A light/dark theme toggle lives in the header. A **persistent watchlist sidebar** (`ui/watchlist.py`) shows live price badges and quick-links into the Predict page; it is rendered on every page via `render_sidebar()`.
 
 Additional UI modules:
 - `ui/theme.py` — CSS injection for light/dark themes via `inject_theme(dark: bool)`.
 - `ui/watchlist.py` — watchlist state persisted to `watchlist.json`; tickers can be added/removed from any page.
+- `ui/components.py` — shared Plotly chart helpers and a dark-mode color palette (`bullish=#00d25b`, `bearish=#ff4b4b`, `neutral=#8b949e`); re-used across the Dashboard, Predict, Backtest, and Trading pages.
 
 ### 5.1 Page inventory
 

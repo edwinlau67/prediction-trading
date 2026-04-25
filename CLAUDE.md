@@ -9,61 +9,70 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Setup
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # then add ANTHROPIC_API_KEY=sk-ant-... to enable AI
+# Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
+make install          # uv sync --all-packages
+cp .env.example .env  # then add ANTHROPIC_API_KEY=sk-ant-... to enable AI
 ```
 
 ## Common commands
 
 ```bash
 # Predict (rule-based, no API key needed)
-python stock_predictor.py --tickers AAPL --no-ai
+uv run stock-predictor --tickers AAPL --no-ai
 
 # Predict with Claude AI
-python stock_predictor.py --tickers AAPL TSLA --timeframe 1m
+uv run stock-predictor --tickers AAPL TSLA --timeframe 1m
 
 # Filter indicator categories
-python stock_predictor.py --tickers NVDA --indicators trend momentum
+uv run stock-predictor --tickers NVDA --indicators trend momentum
 
 # Automated paper trading (one cycle, dry run)
-python automated_trader.py --tickers AAPL TSLA --dry-run --once
+uv run automated-trader --tickers AAPL TSLA --dry-run --once
 
 # Continuous paper trading every 5 min, market hours only
-python automated_trader.py --tickers AAPL --interval 300 --market-hours
+uv run automated-trader --tickers AAPL --interval 300 --market-hours
 
 # Launch Streamlit web UI
-streamlit run app.py
+make ui-dev           # streamlit run frontend/app.py
+
+# Launch REST API
+make api-dev          # uvicorn on :8000 with --reload
 
 # Scan watchlist (bulk signal scoring)
-python scan_watchlist.py AAPL TSLA NVDA
+uv run scan-watchlist AAPL TSLA NVDA
 
 # Run all tests (offline — no API key required)
-pytest tests/ -v
+make test             # uv run pytest backend/tests/ -v
 
 # Run a single test file
-pytest tests/test_signal_scorer.py -v
+uv run pytest backend/tests/test_signal_scorer.py -v
+
+# Lint / format / type-check
+make lint
+make fmt
+make type-check
 ```
 
 ## Architecture
 
-The system has four layers, wired together by `src/system.py:PredictionTradingSystem` (the primary entry point for Python API usage):
+Monorepo (uv workspace): `backend/` (core engine + FastAPI + CLI) and `frontend/` (Streamlit UI) are separate packages wired together by `prediction_trading/system.py:PredictionTradingSystem`.
 
 ```
-CLI entrypoints (stock_predictor.py, automated_trader.py, scan_watchlist.py)
-Web UI          (streamlit run app.py → ui/ — 7 pages)
+CLI entry points (stock-predictor, automated-trader, scan-watchlist)
+Web UI           (frontend/app.py → frontend/ui/ — 7 pages)
+REST API         (prediction_trading/api/ — FastAPI :8000)
         │
-src/system.py — PredictionTradingSystem (facade)
+prediction_trading/system.py — PredictionTradingSystem (facade)
         │
-src/prediction/     ← scoring + AI fusion
-src/reporting/      ← chart + markdown output
+prediction_trading/prediction/  ← scoring + AI fusion
+prediction_trading/reporting/   ← chart + markdown output
         │
-src/trading/        ← Portfolio, RiskManager, AutoTrader, PaperBroker
-src/backtest/       ← bar-by-bar Backtester
+prediction_trading/trading/     ← Portfolio, RiskManager, AutoTrader, PaperBroker
+prediction_trading/backtest/    ← bar-by-bar Backtester
         │
-src/indicators/     ← TechnicalIndicators, SupportResistance
-src/data_fetcher.py ← yfinance OHLCV + fundamentals
-ui/                 ← Streamlit web app (Dashboard, Predict, Scanner, Backtest, Trading, Alerts, Settings)
+prediction_trading/indicators/  ← TechnicalIndicators, SupportResistance
+prediction_trading/data_fetcher.py ← yfinance OHLCV + fundamentals
+frontend/ui/                    ← Streamlit pages + shared components
 ```
 
 ### Prediction pipeline
