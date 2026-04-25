@@ -41,6 +41,9 @@ make api-dev          # uvicorn on :8000 with --reload
 # Scan watchlist (bulk signal scoring)
 uv run scan-watchlist AAPL TSLA NVDA
 
+# Enriched context (news/macro/sector, no API key needed)
+uv run python examples/08_enriched_context.py --ticker AAPL
+
 # Run all tests (offline — no API key required)
 make test             # uv run pytest backend/tests/ -v
 

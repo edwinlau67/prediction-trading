@@ -1,6 +1,6 @@
 # Examples
 
-Six annotated end-to-end examples. All run offline except where AI or live market data is noted.
+Eight annotated end-to-end examples. All run offline except where AI or live market data is noted.
 
 ---
 
@@ -293,7 +293,62 @@ print(f"Bearish factors: {[f.name for f in signal.bearish_factors]}")
 
 ---
 
-## 6. REST API Client
+## 7. Enriched Context (News / Macro / Sector)
+
+Fetch and inspect the three enriched context objects, then score with the `news`, `macro`, and `sector` categories enabled.
+
+**Requires:** live internet (yfinance). No API key needed.
+
+```python
+from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.indicators import TechnicalIndicators
+from prediction_trading.prediction import SignalScorer
+
+ticker = "AAPL"
+fetcher = DataFetcher()
+
+# include_enriched=True populates news_context, macro_context, sector_context
+market = fetcher.fetch(ticker, include_enriched=True)
+
+nc, mc, sc = market.news_context, market.macro_context, market.sector_context
+
+if nc:
+    print(f"News sentiment : {nc.sentiment_score:+.2f}  ({nc.article_count} articles)")
+    print(f"Earnings beat  : {nc.earnings_beat}  miss: {nc.earnings_miss}")
+    for h in nc.recent_headlines[:3]:
+        print(f"  • {h[:80]}")
+
+if mc:
+    print(f"VIX            : {mc.vix}")
+    print(f"Yield spread   : {mc.yield_spread:+.2f}%  SPY>SMA50: {mc.spy_above_sma50}")
+
+if sc:
+    print(f"Sector         : {sc.sector} ({sc.sector_etf})")
+    print(f"Stock vs sector: {sc.vs_sector:+.1f}%  sector vs SPY: {sc.sector_vs_spy:+.1f}%")
+
+# Score with all nine categories (enriched contexts are passed explicitly)
+df = TechnicalIndicators.compute_all(market.ohlcv)
+scorer = SignalScorer(categories=("trend", "momentum", "news", "macro", "sector"))
+signal = scorer.score(
+    df,
+    news_context=nc,
+    macro_context=mc,
+    sector_context=sc,
+)
+
+arrow = {"bullish": "↑", "bearish": "↓"}.get(signal.direction, "→")
+print(f"\n{ticker}: {arrow} {signal.direction.upper()}  "
+      f"(net {signal.net_points:+d} pts, conf {signal.confidence:.0%})")
+for f in signal.factors:
+    marker = "+" if f.direction == "bullish" else "-"
+    print(f"  [{marker}] [{f.category:<11}] {f.name:<35} {f.signed:+d} pts")
+```
+
+Run directly: `uv run python examples/08_enriched_context.py --ticker NVDA`
+
+---
+
+## 8. REST API Client
 
 Call the FastAPI server programmatically. Start the server first:
 
