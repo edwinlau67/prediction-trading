@@ -1,10 +1,10 @@
 # API Reference
 
-All public classes and methods in `src/`. Import via `from src import PredictionTradingSystem` or individual modules.
+All public classes and methods in `prediction_trading/`. Import via `from prediction_trading import PredictionTradingSystem` or individual modules.
 
 ---
 
-## `PredictionTradingSystem` — `src/system.py`
+## `PredictionTradingSystem` — `prediction_trading/system.py`
 
 Top-level façade. Instantiate once per ticker per session.
 
@@ -65,7 +65,7 @@ class PredictionTradingSystem:
 
 ---
 
-## `WatchlistScanner` — `src/scanner.py`
+## `WatchlistScanner` — `prediction_trading/scanner.py`
 
 Parallel rule-based screening without charts or AI.
 
@@ -95,7 +95,7 @@ class WatchlistScanner:
 
 ---
 
-## `SignalScorer` — `src/prediction/signal_scorer.py`
+## `SignalScorer` — `prediction_trading/prediction/signal_scorer.py`
 
 Point-based rule engine. Stateless; call `score()` with any enriched DataFrame.
 
@@ -145,7 +145,7 @@ class SignalScorer:
 
 ---
 
-## `AIPredictor` — `src/prediction/ai_predictor.py`
+## `AIPredictor` — `prediction_trading/prediction/ai_predictor.py`
 
 Claude tool-use prediction. Requires `ANTHROPIC_API_KEY`.
 
@@ -168,18 +168,18 @@ class AIPredictor:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-6",
+        model: str = "claude-opus-4-7",
         max_tokens: int = 2000,
         data_fetcher: DataFetcher | None = None,
         categories: tuple[str, ...] | None = None,
     ) -> None
 
-    def predict(self, ticker: str, timeframe: str = "1w") -> AIPrediction
+    def predict(self, ticker: str, timeframe: str = "1m") -> AIPrediction
 ```
 
 ---
 
-## `UnifiedPredictor` — `src/prediction/predictor.py`
+## `UnifiedPredictor` — `prediction_trading/prediction/predictor.py`
 
 Fuses rule-based and AI signals.
 
@@ -226,7 +226,7 @@ class UnifiedPredictor:
 
 ---
 
-## `TechnicalIndicators` — `src/indicators/technical.py`
+## `TechnicalIndicators` — `prediction_trading/indicators/technical.py`
 
 All methods are `@staticmethod` or `@classmethod`. All inputs/outputs are `pd.Series` or `pd.DataFrame`.
 
@@ -280,7 +280,7 @@ class TechnicalIndicators:
 
 ---
 
-## `SupportResistance` — `src/indicators/levels.py`
+## `SupportResistance` — `prediction_trading/indicators/levels.py`
 
 ```python
 @dataclass
@@ -306,7 +306,7 @@ class SupportResistance:
 
 ---
 
-## `RiskManager` — `src/trading/risk_manager.py`
+## `RiskManager` — `prediction_trading/trading/risk_manager.py`
 
 ```python
 @dataclass
@@ -347,7 +347,7 @@ class RiskManager:
 
 ---
 
-## `Portfolio` — `src/trading/portfolio.py`
+## `Portfolio` — `prediction_trading/trading/portfolio.py`
 
 ```python
 @dataclass
@@ -399,7 +399,7 @@ class Portfolio:
 
 ---
 
-## `AutoTrader` — `src/trading/auto_trader.py`
+## `AutoTrader` — `prediction_trading/trading/auto_trader.py`
 
 ```python
 @dataclass
@@ -445,7 +445,7 @@ class AutoTrader:
 
 ---
 
-## `Backtester` — `src/backtest/backtester.py`
+## `Backtester` — `prediction_trading/backtest/backtester.py`
 
 ```python
 @dataclass
@@ -455,8 +455,9 @@ class BacktestResult:
     portfolio: Portfolio
 
     def summary(self) -> dict
-        # Keys: return_pct, max_drawdown_pct, win_rate_pct, profit_factor,
-        #       total_trades, winning_trades, losing_trades, avg_win_pct, avg_loss_pct
+        # Keys: ticker, period, initial_capital, final_equity,
+        #       return_pct, max_drawdown_pct, trades, win_rate_pct,
+        #       avg_win, avg_loss, profit_factor
 
 class Backtester:
     def __init__(
@@ -477,7 +478,7 @@ class Backtester:
 
 ---
 
-## `DataFetcher` — `src/data_fetcher.py`
+## `DataFetcher` — `prediction_trading/data_fetcher.py`
 
 ```python
 @dataclass
@@ -512,7 +513,7 @@ class DataFetcher:
 
 ---
 
-## `Factor` — `src/prediction/factor.py`
+## `Factor` — `prediction_trading/prediction/factor.py`
 
 ```python
 Direction = Literal["bullish", "bearish", "neutral"]
@@ -535,7 +536,7 @@ class Factor:
 
 ---
 
-## `StateStore` — `src/trading/state.py`
+## `StateStore` — `prediction_trading/trading/state.py`
 
 ```python
 class StateStore:
@@ -552,7 +553,7 @@ class StateStore:
 
 ---
 
-## `BaseBroker` — `src/trading/broker.py`
+## `BaseBroker` — `prediction_trading/trading/broker.py`
 
 Implement these three methods to integrate a live broker:
 
@@ -572,4 +573,72 @@ class BaseBroker(ABC):
         quote: float | None = None,
         when: datetime | None = None,
     ) -> Trade | None
+```
+
+---
+
+## REST API — `prediction_trading/api/`
+
+FastAPI application. Start with:
+
+```bash
+uv run uvicorn prediction_trading.api.main:app --reload
+# Docs at http://localhost:8000/docs
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Returns `{"status": "ok"}` |
+| `POST` | `/predict/` | Single-ticker prediction |
+| `POST` | `/scan/` | Parallel watchlist scan |
+| `POST` | `/backtest/` | Bar-by-bar backtest |
+| `POST` | `/trading/start` | Initialise an AutoTrader session |
+| `GET` | `/trading/status` | Current AutoTrader state |
+
+### Request / response schemas
+
+```python
+# POST /predict/
+class PredictRequest(BaseModel):
+    ticker: str
+    timeframe: str = "1w"
+    enable_ai: bool = False
+    lookback_days: int = 365
+    categories: list[str] | None = None
+    use_4h: bool = False
+
+class PredictResponse(BaseModel):
+    ticker: str; direction: str; confidence: float
+    current_price: float; price_target: float | None
+    target_date: str | None; risk_level: str
+    factors: list[FactorResponse]; meta: dict
+
+# POST /scan/
+class ScanRequest(BaseModel):
+    tickers: list[str]
+    categories: list[str] | None = None
+    min_confidence: float = 0.0
+    workers: int = 4
+
+class ScanResponse(BaseModel):
+    results: list[ScanResultResponse]
+    total: int
+
+# POST /backtest/
+class BacktestRequest(BaseModel):
+    ticker: str; start: str; end: str
+    initial_capital: float = 10_000.0
+    commission: float = 1.0
+
+class BacktestResponse(BaseModel):
+    stats: BacktestStatsResponse   # return_pct, max_drawdown_pct, trades, win_rate_pct, …
+
+# POST /trading/start
+class TradingStartRequest(BaseModel):
+    tickers: list[str]
+    initial_capital: float = 10_000.0
+    dry_run: bool = True
+    enforce_market_hours: bool = False
 ```
