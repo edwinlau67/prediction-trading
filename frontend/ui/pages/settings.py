@@ -1,6 +1,7 @@
 """Settings page — read/write config/default.yaml and apply risk profiles."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -8,8 +9,9 @@ import yaml
 
 from ui.state import ACTIVE_PROFILE, SETTINGS_DIRTY
 
-_DEFAULT_CFG = Path("config/default.yaml")
-_PROFILES_CFG = Path("config/risk_profiles.yaml")
+_cfg_dir = Path(os.environ.get("PREDICTION_TRADING_CONFIG_DIR", "config"))
+_DEFAULT_CFG = _cfg_dir / "default.yaml"
+_PROFILES_CFG = _cfg_dir / "risk_profiles.yaml"
 
 
 def _load(path: Path) -> dict:

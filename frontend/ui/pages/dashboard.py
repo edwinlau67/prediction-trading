@@ -179,7 +179,7 @@ def _get_portfolio():
     state_path = Path("results/live/portfolio_state.json")
     if state_path.exists():
         try:
-            from src.trading.state import StateStore
+            from prediction_trading.trading.state import StateStore
             store = StateStore(state_path)
             return store.load_or_create(initial_capital=10_000.0, commission_per_trade=1.0)
         except Exception:

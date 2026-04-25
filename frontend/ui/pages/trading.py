@@ -192,7 +192,7 @@ def _start_trader(
     state_path: str,
 ) -> None:
     try:
-        from src.system import PredictionTradingSystem
+        from prediction_trading.system import PredictionTradingSystem
 
         system = PredictionTradingSystem(ticker=tickers[0])
         Path(state_path).parent.mkdir(parents=True, exist_ok=True)

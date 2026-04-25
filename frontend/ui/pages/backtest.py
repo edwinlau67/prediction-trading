@@ -48,7 +48,7 @@ def render() -> None:
 
 def _run_backtest(ticker, start, end, capital, commission) -> None:
     try:
-        from src.system import PredictionTradingSystem
+        from prediction_trading.system import PredictionTradingSystem
 
         system = PredictionTradingSystem(ticker=ticker, initial_capital=capital)
         system.cfg.portfolio["commission_per_trade"] = commission
@@ -118,7 +118,7 @@ def _show_results(result, initial_capital: float = 10_000.0) -> None:
             sells = [
                 (t.exit_time, t.exit_price) for t in trades
             ]
-            from src.indicators import TechnicalIndicators
+            from prediction_trading.indicators import TechnicalIndicators
             df = TechnicalIndicators.compute_all(ohlcv)
             candlestick_chart(
                 df,
@@ -138,8 +138,8 @@ def _show_results(result, initial_capital: float = 10_000.0) -> None:
     ticker_key = st.session_state.get(BT_TICKER, "")
     if ticker_key and st.button("💾 Save Full Report"):
         try:
-            from src.data_fetcher import MarketData
-            from src.system import PredictionTradingSystem
+            from prediction_trading.data_fetcher import MarketData
+            from prediction_trading.system import PredictionTradingSystem
 
             ohlcv = st.session_state.get(BT_OHLCV)
             system = PredictionTradingSystem(ticker=ticker_key, initial_capital=initial_capital)

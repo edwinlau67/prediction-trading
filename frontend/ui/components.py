@@ -8,8 +8,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 try:
-    from src.prediction.predictor import Prediction
-    from src.trading.portfolio import Trade
+    from prediction_trading.prediction.predictor import Prediction
+    from prediction_trading.trading.portfolio import Trade
 except ImportError:
     Prediction = object  # type: ignore[misc,assignment]
     Trade = object       # type: ignore[misc,assignment]

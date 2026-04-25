@@ -51,7 +51,7 @@ def render() -> None:
 
 def _run_scan(tickers, min_conf, categories, workers) -> None:
     try:
-        from src.scanner import WatchlistScanner
+        from prediction_trading.scanner import WatchlistScanner
 
         scanner = WatchlistScanner(
             categories=tuple(categories) if categories else None,

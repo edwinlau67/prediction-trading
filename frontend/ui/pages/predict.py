@@ -101,11 +101,11 @@ def _run_prediction(
     save_report: bool,
 ) -> None:
     try:
-        from src.data_fetcher import DataFetcher
-        from src.indicators import TechnicalIndicators
-        from src.prediction import SignalScorer
-        from src.reporting.prediction_chart import PredictionChart
-        from src.system import PredictionTradingSystem
+        from prediction_trading.data_fetcher import DataFetcher
+        from prediction_trading.indicators import TechnicalIndicators
+        from prediction_trading.prediction import SignalScorer
+        from prediction_trading.reporting.prediction_chart import PredictionChart
+        from prediction_trading.system import PredictionTradingSystem
 
         system = PredictionTradingSystem(
             ticker=ticker,
@@ -118,7 +118,7 @@ def _run_prediction(
         )
         if enable_ai and system.ai_predictor:
             system.ai_predictor.categories = tuple(categories) if categories else None
-        from src.prediction.predictor import UnifiedPredictor as UP
+        from prediction_trading.prediction.predictor import UnifiedPredictor as UP
         system.predictor = UP(
             scorer=system.scorer,
             ai=system.ai_predictor,
