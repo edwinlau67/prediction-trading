@@ -78,12 +78,12 @@ frontend/ui/                    ← Streamlit pages + shared components
 ### Prediction pipeline
 
 1. `SignalScorer` emits `Factor(category, name, direction, points, detail)` objects for each active indicator category. Net points → direction + confidence (`min(1.0, abs(points)/10)`).
-2. `AIPredictor` uses Claude tool-use: the model calls the `stock_prediction` tool → local execution fetches data and runs `SignalScorer` → second API call returns a narrative. The system prompt carries `cache_control: {type: "ephemeral"}` for prompt caching.
+2. `AIPredictor` uses Claude tool-use: the model calls the `stock_prediction` tool → local execution fetches data (with `include_enriched=True`) and runs `SignalScorer` (passing `news_context`, `macro_context`, `sector_context`) → second API call returns a narrative (≤500 words). The system prompt carries `cache_control: {type: "ephemeral"}` for prompt caching.
 3. `UnifiedPredictor` blends: `(1 - ai_weight) * rule_signed + ai_weight * ai_signed`. Default `ai_weight = 0.5` from `config/default.yaml`. Falls back to rule-only when AI is disabled.
 
 ### Category filtering (`--indicators`)
 
-Passing `--indicators trend momentum` (or setting `indicators.categories` in `config/default.yaml`) controls three things in lockstep: which scoring rules run, which chart panels render, and what the AI tool result reports. The three base chart panels (Price+Target, Confidence arc gauge, Signal Factors bar chart) always render.
+Passing `--indicators trend momentum` (or setting `indicators.categories` in `config/default.yaml`) controls three things in lockstep: which scoring rules run, which chart panels render, and what the AI tool result reports. The three base chart panels (Price+Target, Confidence arc gauge, Signal Factors bar chart) always render. Nine categories available: `trend`, `momentum`, `volatility`, `volume`, `support`, `fundamental`, `news`, `macro`, `sector`. The `news`/`macro`/`sector` categories also require the corresponding context from `include_enriched=True` fetching.
 
 ### Trading / risk management
 

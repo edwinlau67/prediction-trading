@@ -111,22 +111,34 @@ prediction-trading/           ← uv workspace root (pyproject.toml)
 
 ### 4.1 DataFetcher (`prediction_trading/data_fetcher.py`)
 
-**Responsibility:** Fetch OHLCV history and fundamentals from Yahoo Finance.
+**Responsibility:** Fetch OHLCV history, fundamentals, and optional enriched market context (news, macro, sector) from Yahoo Finance.
 
 **Interface:**
 
 ```python
 DataFetcher(interval: str = "1d")
-    .fetch(ticker, *, lookback_days=365, include_fundamentals=True) -> MarketData
+    .fetch(ticker, *, lookback_days=365, include_fundamentals=True, include_enriched=False) -> MarketData
     .fetch_history(ticker, *, lookback_days=None, start=None, end=None) -> pd.DataFrame
     .fetch_fundamentals(ticker) -> dict
+    .fetch_news_context(ticker) -> NewsContext
+    .fetch_macro_context() -> MacroContext
+    .fetch_sector_context(ticker, stock_ohlcv) -> SectorContext
 ```
 
-**`MarketData` fields:** `ticker`, `ohlcv: pd.DataFrame`, `current_price: float`, `fundamentals: dict`.
+**`MarketData` fields:** `ticker`, `ohlcv: pd.DataFrame`, `current_price: float`, `fundamentals: dict`, `interval: str`, `news_context: NewsContext | None`, `macro_context: MacroContext | None`, `sector_context: SectorContext | None`.
+
+**Enriched context dataclasses:**
+
+| Dataclass | Fields |
+|---|---|
+| `NewsContext` | `sentiment_score: float` (−1..1 keyword ratio), `article_count: int`, `recent_headlines: list[str]`, `earnings_beat: bool|None`, `earnings_miss: bool|None`, `earnings_upcoming_days: int|None` |
+| `MacroContext` | `vix: float|None`, `yield_10y: float|None`, `yield_2y: float|None`, `yield_spread: float|None` (10Y−2Y), `spy_above_sma50: bool|None` |
+| `SectorContext` | `sector: str`, `sector_etf: str`, `stock_30d_return: float|None`, `sector_30d_return: float|None`, `spy_30d_return: float|None`, `vs_sector: float|None`, `sector_vs_spy: float|None` |
 
 **Constraints:**
 - OHLCV index is a `DatetimeIndex` with timezone stripped.
 - `fetch_fundamentals` is best-effort; exceptions are caught and an empty dict returned.
+- `include_enriched=False` by default; set to `True` to populate the three context fields on `MarketData`. `AIPredictor` always calls `fetch(..., include_enriched=True)`.
 - The `interval` parameter accepts any yfinance-valid interval string (`"1d"`, `"1h"`, `"1wk"`, etc.).
 
 ---
@@ -190,6 +202,14 @@ All methods accept `pd.Series` (or `pd.DataFrame` for `compute_all`) and return 
 | `support` | Price above / below Pivot Point | ±1 |
 | `support` | Rising support hold / support broken | ±1 |
 | `fundamental` | P/E, PEG, growth, margins, ROE, D/E, CR, P/B | ±1 each |
+| `news` | News sentiment score (keyword ratio) bullish / bearish | ±2 |
+| `news` | Recent earnings beat / miss | ±2 |
+| `news` | Upcoming earnings within 30 days | 0 (note only) |
+| `macro` | VIX < 15 (calm) / > 30 (fear) | ±2 / ±1 |
+| `macro` | Yield curve spread (10Y−2Y) positive / negative | ±1 |
+| `macro` | SPY above / below 50-day SMA | ±1 |
+| `sector` | Stock 30-day return vs sector ETF outperforming / underperforming | ±1 |
+| `sector` | Sector ETF 30-day return vs SPY outperforming / underperforming | ±1 |
 | *(bonus)* | Weekly timeframe agrees with daily | ±2 |
 | *(bonus)* | 4H timeframe agrees with daily | ±1 (= `max(1, multi_timeframe_bonus − 1)`) |
 
@@ -204,7 +224,7 @@ confidence  = min(1.0, abs(net_points) / 10.0) # 0..1  (10 points = 100%)
 
 ```python
 SignalScorer(
-    categories: tuple[str, ...] | None = None,  # None = all six
+    categories: tuple[str, ...] | None = None,  # None = all nine
     weights: dict | None = None,                 # legacy component weights
     multi_timeframe_bonus: int = 2,
 )
@@ -214,6 +234,9 @@ SignalScorer(
         weekly: pd.DataFrame | None = None,
         hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
+        news_context: NewsContext | None = None,
+        macro_context: MacroContext | None = None,
+        sector_context: SectorContext | None = None,
     ) -> ScoredSignal
 ```
 
@@ -221,7 +244,7 @@ SignalScorer(
 
 **`Factor` fields:** `category`, `name`, `direction`, `points`, `detail`, `signed` (signed magnitude).
 
-**Category filtering:** Rules in omitted categories are skipped entirely; the 5-component view treats them as 0.
+**Category filtering:** Rules in omitted categories are skipped entirely; the 5-component view treats them as 0. News, macro, and sector factors require the corresponding context object to be passed; if `None`, the category is silently skipped regardless of the categories filter.
 
 ---
 
@@ -242,10 +265,14 @@ AIPredictor ──► Anthropic Messages API
                     ▼
        AIPredictor._predict_from_market(MarketData, timeframe)
                     │  local: yfinance OHLCV, TechnicalIndicators.compute_all,
-                    │  SignalScorer.score, price target projection → JSON result
+                    │  SignalScorer.score (with news/macro/sector contexts),
+                    │  price target projection → JSON result
+                    │  tool result includes optional "news", "macro", "sector" dicts
                     ▼
-            Second API call with tool_result ──► narrative response
+            Second API call with tool_result ──► narrative response (≤500 words)
 ```
+
+The Claude narrative is instructed to comment on news sentiment/earnings, VIX/yield-curve regime, and sector relative strength when those fields are present in the tool result.
 
 **Prompt caching:** The system prompt is tagged `cache_control: {"type": "ephemeral"}`. Repeated calls within 5 minutes incur ~10% of the first-call input token cost.
 
@@ -322,7 +349,7 @@ The `--indicators` CLI flag, the `indicators.categories` config key, and the Set
 2. **Chart panels** — only panels matching the active categories render; the three base panels (Price+Target, Confidence arc, Signal Factors bar) always render.
 3. **AI tool output** — active categories are embedded in the system prompt so Claude's narrative stays consistent with the chart and factors.
 
-All six categories are active by default: `trend`, `momentum`, `volatility`, `volume`, `support`, `fundamental`.
+All nine categories are active by default: `trend`, `momentum`, `volatility`, `volume`, `support`, `fundamental`, `news`, `macro`, `sector`.
 
 ---
 
@@ -668,11 +695,11 @@ signals:
   ai_weight: 0.50
 
 indicators:
-  categories: [trend, momentum, volatility, volume, support, fundamental]
+  categories: [trend, momentum, volatility, volume, support, fundamental, news, macro, sector]
 
 ai:
-  enabled: false
-  model: claude-sonnet-4-6
+  enabled: true
+  model: claude-opus-4-7
   timeframe: 1w
   max_tokens: 2000
 

@@ -31,7 +31,7 @@
 ## Features
 
 - **AI-powered predictions** via Claude tool-use with prompt caching
-- **Six indicator categories**: trend, momentum, volatility, volume, support, fundamental
+- **Nine indicator categories**: trend, momentum, volatility, volume, support, fundamental, news, macro, sector
 - **Bar-by-bar backtester** with full performance reports and four chart panels
 - **Paper trading engine** with ATR-based risk management and portfolio persistence
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
@@ -162,8 +162,8 @@ uv run stock-predictor --tickers AAPL --model claude-opus-4-7
 ```
 --tickers           One or more ticker symbols (default: AAPL TSLA INTC)
 --timeframe         1d | 1w | 1m | 3m | 6m | ytd | 1y | 2y | 5y (default: 1w)
---model             Claude model ID (default: claude-sonnet-4-6)
---indicators        trend | momentum | volatility | volume | support | fundamental
+--model             Claude model ID (default: claude-opus-4-7)
+--indicators        trend | momentum | volatility | volume | support | fundamental | news | macro | sector
 --no-ai             Rule-based only; skip the Claude call
 --4h                Enable 4H confluence bonus (resamples 1h OHLCV to 4H)
 --thinking-budget   Extended thinking token budget (0 = disabled)
@@ -293,6 +293,9 @@ All computed from Yahoo Finance OHLCV (1-year daily) plus a fundamentals snapsho
 | `volume` | OBV trend, Volume Spike (>20-day mean + 2σ) |
 | `fundamental` | P/E, Forward P/E, P/B, P/S, EV/EBITDA, PEG, Revenue Growth, EPS Growth, Net Margin, Operating Margin, ROE, Debt/Equity, Current Ratio, Dividend Yield, Short Ratio |
 | `support` | Trendlines (5-bar swing), Pivot Points (R2/R1/PP/S1/S2), Fibonacci (0%–100%) |
+| `news` | Keyword-based headline sentiment score, recent earnings beat/miss, upcoming earnings calendar |
+| `macro` | VIX regime (calm/fear), yield curve spread (10Y−2Y), SPY vs 50-day SMA |
+| `sector` | Stock 30-day return vs sector ETF (XLK, XLV, XLF…), sector ETF vs SPY |
 
 Confidence is deterministic: `min(1.0, abs(net_points) / 10)`. See [`DESIGN.md`](DESIGN.md) for the full point table.
 
