@@ -1,21 +1,18 @@
 """Run a single automated-trading cycle against a live paper broker.
 
-This example mirrors what ``automated_trader.py --once --dry-run`` does,
+This example mirrors what ``automated-trader --once --dry-run`` does,
 but as a plain Python script so you can inspect the returned
-:class:`~src.trading.CycleReport` object.
+:class:`~prediction_trading.trading.CycleReport` object.
 
 Run:
-    python examples/04_automated_trading.py --tickers AAPL TSLA
+    uv run python examples/04_automated_trading.py --tickers AAPL TSLA
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src import PredictionTradingSystem  # noqa: E402
+from prediction_trading import PredictionTradingSystem
 
 
 def main() -> int:

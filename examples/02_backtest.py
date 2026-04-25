@@ -1,17 +1,14 @@
 """Run a full backtest and write a Markdown + charts report.
 
 Run:
-    python examples/02_backtest.py --ticker AAPL --start 2023-01-01 --end 2024-01-01
+    uv run python examples/02_backtest.py --ticker AAPL --start 2023-01-01 --end 2024-01-01
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src import PredictionTradingSystem  # noqa: E402
+from prediction_trading import PredictionTradingSystem
 
 
 def main() -> int:

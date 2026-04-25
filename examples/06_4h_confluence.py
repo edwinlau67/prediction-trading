@@ -6,20 +6,17 @@ When the 4H signal agrees with the daily signal, an extra point is awarded.
 Requires live internet (yfinance). No API key needed unless --ai is passed.
 
 Run:
-    python examples/06_4h_confluence.py --ticker AAPL
-    python examples/06_4h_confluence.py --ticker NVDA --ai
+    uv run python examples/06_4h_confluence.py --ticker AAPL
+    uv run python examples/06_4h_confluence.py --ticker NVDA --ai
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src import PredictionTradingSystem  # noqa: E402
-from src.data_fetcher import DataFetcher  # noqa: E402
-from src.indicators import TechnicalIndicators  # noqa: E402
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.indicators import TechnicalIndicators
 
 _RESAMPLE_RULES = {"Open": "first", "High": "max", "Low": "min",
                    "Close": "last", "Volume": "sum"}

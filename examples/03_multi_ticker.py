@@ -1,19 +1,16 @@
 """Compare predictions and backtests across multiple tickers.
 
 Run:
-    python examples/03_multi_ticker.py --tickers AAPL MSFT GOOGL TSLA
+    uv run python examples/03_multi_ticker.py --tickers AAPL MSFT GOOGL TSLA
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src import PredictionTradingSystem  # noqa: E402
+from prediction_trading import PredictionTradingSystem
 
 
 def main() -> int:

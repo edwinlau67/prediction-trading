@@ -3,21 +3,18 @@
 No API key required — rule-based only.
 
 Run:
-    python examples/05_watchlist_scan.py
-    python examples/05_watchlist_scan.py --tickers AAPL MSFT NVDA TSLA META
-    python examples/05_watchlist_scan.py --min-confidence 0.4 --indicators trend momentum
-    python examples/05_watchlist_scan.py --workers 8 --csv scan_results.csv
+    uv run python examples/05_watchlist_scan.py
+    uv run python examples/05_watchlist_scan.py --tickers AAPL MSFT NVDA TSLA META
+    uv run python examples/05_watchlist_scan.py --min-confidence 0.4 --indicators trend momentum
+    uv run python examples/05_watchlist_scan.py --workers 8 --csv scan_results.csv
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.scanner import WatchlistScanner  # noqa: E402
+from prediction_trading.scanner import WatchlistScanner
 
 _DEFAULT_TICKERS = [
     "AAPL", "MSFT", "NVDA", "TSLA", "META",

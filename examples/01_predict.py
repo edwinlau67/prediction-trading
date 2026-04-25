@@ -1,18 +1,15 @@
 """Quick prediction: rule-based + optional AI fusion.
 
 Run:
-    python examples/01_predict.py --ticker AAPL
-    ANTHROPIC_API_KEY=... python examples/01_predict.py --ticker AAPL --ai
+    uv run python examples/01_predict.py --ticker AAPL
+    ANTHROPIC_API_KEY=... uv run python examples/01_predict.py --ticker AAPL --ai
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src import PredictionTradingSystem  # noqa: E402
+from prediction_trading import PredictionTradingSystem
 
 
 def main() -> int:
