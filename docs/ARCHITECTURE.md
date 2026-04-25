@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Prediction Trading System is a Python-based platform that combines rule-based technical analysis, optional Claude AI prediction, backtesting, and live paper trading. It exposes two surfaces: a Streamlit web UI (`streamlit run app.py`) and a set of CLI entrypoints.
+The Prediction Trading System is a Python-based platform that combines rule-based technical analysis, optional Claude AI prediction, backtesting, and live paper trading. It exposes three surfaces: a Streamlit web UI (`uv run streamlit run frontend/app.py`), a FastAPI REST API (`uv run uvicorn prediction_trading.api.main:app`), and a set of CLI entrypoints.
 
 ---
 
@@ -11,12 +11,12 @@ The Prediction Trading System is a Python-based platform that combines rule-base
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                     USER INTERFACES                              │
-│  app.py (Streamlit)    stock_predictor.py    automated_trader.py │
-│  scan_watchlist.py                                               │
+│  frontend/app.py (Streamlit)   stock-predictor   automated-trader│
+│  scan-watchlist                prediction_trading/api/ (FastAPI) │
 └───────────────────────────┬──────────────────────────────────────┘
                             │
 ┌───────────────────────────▼──────────────────────────────────────┐
-│                  src/system.py — PredictionTradingSystem         │
+│          prediction_trading/system.py — PredictionTradingSystem  │
 │   (façade: fetch / predict / backtest / save_report /            │
 │    build_auto_trader)                                            │
 └──┬────────────────┬─────────────────────┬────────────────────────┘
@@ -32,7 +32,7 @@ The Prediction Trading System is a Python-based platform that combines rule-base
 ┌──▼──────────┐  └──────────────────┘
 │  INDICATORS │
 │             │
-│ TechnicalIn.│◄── src/data_fetcher.py (yfinance OHLCV + fundamentals)
+│ TechnicalIn.│◄── prediction_trading/data_fetcher.py (yfinance OHLCV + fundamentals)
 │ SupportRes. │
 └─────────────┘
         │
@@ -93,40 +93,40 @@ AutoTrader.run(interval_seconds=300)
 
 ## Component Descriptions
 
-### `src/system.py — PredictionTradingSystem`
+### `prediction_trading/system.py — PredictionTradingSystem`
 The top-level façade. Reads `config/default.yaml`, instantiates all sub-components, and exposes a high-level API. Every CLI and UI page goes through this class.
 
-### `src/prediction/signal_scorer.py — SignalScorer`
+### `prediction_trading/prediction/signal_scorer.py — SignalScorer`
 Point-based rule engine. Six indicator categories emit `Factor` objects (±1 to ±2 points each). Net points → direction + confidence (`min(1.0, |net| / confidence_scale)`). Multi-timeframe bonuses applied for weekly and 4H agreement.
 
-### `src/prediction/ai_predictor.py — AIPredictor`
+### `prediction_trading/prediction/ai_predictor.py — AIPredictor`
 Claude tool-use loop. The model calls `stock_prediction` tool → local execution runs `SignalScorer` → second API call returns a narrative. System prompt uses `cache_control: ephemeral` for prompt caching (~10% cost on cache hits).
 
-### `src/prediction/predictor.py — UnifiedPredictor`
+### `prediction_trading/prediction/predictor.py — UnifiedPredictor`
 Fuses rule and AI signals: `blended = (1 - ai_weight) × rule_signed + ai_weight × ai_signed`. Falls back to rule-only when AI is disabled or unavailable.
 
-### `src/trading/risk_manager.py — RiskManager`
+### `prediction_trading/trading/risk_manager.py — RiskManager`
 Sequential gate: min_confidence → max_positions → max_position_size → available_cash → daily_loss_cap → R:R ratio. Returns a `TradeProposal` or `None`.
 
-### `src/trading/broker.py — PaperBroker`
+### `prediction_trading/trading/broker.py — PaperBroker`
 Simulated fills against `Portfolio`. Applies optional slippage in basis points. `RecordingBroker` is a thin test double.
 
-### `src/trading/portfolio.py — Portfolio`
+### `prediction_trading/trading/portfolio.py — Portfolio`
 Tracks open `Position` objects, closed `Trade` history, equity curve snapshots, and cash balance. `Portfolio.equity(prices)` marks all open positions to market.
 
-### `src/trading/state.py — StateStore`
+### `prediction_trading/trading/state.py — StateStore`
 JSON-backed persistence. `load_or_create()` restores the portfolio across restarts; `save()` serialises it after each cycle.
 
-### `src/backtest/backtester.py — Backtester`
+### `prediction_trading/backtest/backtester.py — Backtester`
 Bar-by-bar simulation with 200-bar indicator warmup. Checks exits (stop/target) before scoring each bar to prevent look-ahead bias.
 
-### `src/data_fetcher.py — DataFetcher`
+### `prediction_trading/data_fetcher.py — DataFetcher`
 Thin wrapper around `yfinance`. Normalises MultiIndex columns, removes NaN rows, and returns `MarketData`.
 
-### `src/scanner.py — WatchlistScanner`
+### `prediction_trading/scanner.py — WatchlistScanner`
 `ThreadPoolExecutor`-based parallel screening. Reuses `SignalScorer` without charts or reporting for low-latency bulk scanning.
 
-### Reporting (`src/reporting/`)
+### Reporting (`prediction_trading/reporting/`)
 - `PredictionChart`: Multi-panel matplotlib PNG — Price+Target, Confidence arc, Signal Factors, and optional category panels (MACD, RSI, Stochastic, Volume, Support, ATR, Fundamentals).
 - `ChartBuilder`: Four backtest PNG charts (indicators, signals, performance, risk).
 - `ReportWriter`: Orchestrates both flows, places output in `results/<prefix>_<timestamp>/`.

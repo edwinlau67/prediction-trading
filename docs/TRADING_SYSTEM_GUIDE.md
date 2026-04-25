@@ -5,13 +5,14 @@
 1. [Installation](#installation)
 2. [Launch the Web UI](#launch-the-web-ui)
 3. [CLI Usage](#cli-usage)
-4. [Python API](#python-api)
-5. [Backtesting](#backtesting)
-6. [Live / Paper Trading](#live--paper-trading)
-7. [Watchlist Scanning](#watchlist-scanning)
-8. [Configuration Guide](#configuration-guide)
-9. [AI Integration](#ai-integration)
-10. [Extending the System](#extending-the-system)
+4. [REST API](#rest-api)
+5. [Python API](#python-api)
+6. [Backtesting](#backtesting)
+7. [Live / Paper Trading](#live--paper-trading)
+8. [Watchlist Scanning](#watchlist-scanning)
+9. [Configuration Guide](#configuration-guide)
+10. [AI Integration](#ai-integration)
+11. [Extending the System](#extending-the-system)
 
 ---
 
@@ -20,8 +21,7 @@
 ```bash
 git clone <repo>
 cd prediction-trading
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 cp .env.example .env
 # Add your Anthropic key to enable AI (optional):
 # ANTHROPIC_API_KEY=sk-ant-...
@@ -29,8 +29,8 @@ cp .env.example .env
 
 Verify:
 ```bash
-pytest tests/ -v          # 78 tests, all offline — no API key needed
-python stock_predictor.py --tickers AAPL --no-ai
+uv run pytest backend/tests/ -v   # 11 test files, all offline — no API key needed
+uv run stock-predictor --tickers AAPL --no-ai
 ```
 
 ---
@@ -38,7 +38,7 @@ python stock_predictor.py --tickers AAPL --no-ai
 ## Launch the Web UI
 
 ```bash
-streamlit run app.py
+uv run streamlit run frontend/app.py
 ```
 
 Opens at `http://localhost:8501`. Seven pages via a top navigation bar (with a light/dark theme toggle in the header). A persistent watchlist sidebar shows live price badges on every page.
@@ -57,53 +57,81 @@ Opens at `http://localhost:8501`. Seven pages via a top navigation bar (with a l
 
 ## CLI Usage
 
-### `stock_predictor.py` — Prediction report
+### `stock-predictor` — Prediction report
 
 ```bash
 # Rule-based (no API key needed)
-python stock_predictor.py --tickers AAPL --no-ai
+uv run stock-predictor --tickers AAPL --no-ai
 
 # Multi-ticker with Claude AI
-python stock_predictor.py --tickers AAPL TSLA NVDA --timeframe 1w
+uv run stock-predictor --tickers AAPL TSLA NVDA --timeframe 1m
 
 # Filter indicator categories (faster, fewer panels)
-python stock_predictor.py --tickers MSFT --indicators trend momentum volatility
+uv run stock-predictor --tickers MSFT --indicators trend momentum volatility
 
 # Extended thinking budget
-python stock_predictor.py --tickers GOOG --thinking-budget 10000
+uv run stock-predictor --tickers GOOG --thinking-budget 10000
 ```
 
 Output: `results/predict_YYYYMMDD_HHMMSS/predictions.md` + PNG charts
 
-### `scan_watchlist.py` — Watchlist scan
+### `scan-watchlist` — Watchlist scan
 
 ```bash
 # Scan tickers with default settings
-python scan_watchlist.py AAPL MSFT NVDA TSLA GOOGL
+uv run scan-watchlist AAPL MSFT NVDA TSLA GOOGL
 
 # Filter by confidence and categories
-python scan_watchlist.py AAPL TSLA NVDA --min-confidence 0.4 --indicators trend momentum
+uv run scan-watchlist AAPL TSLA NVDA --min-confidence 0.4 --indicators trend momentum
 
 # Use more parallel workers
-python scan_watchlist.py $(cat my_watchlist.txt | tr '\n' ' ') --workers 8
+uv run scan-watchlist $(cat my_watchlist.txt | tr '\n' ' ') --workers 8
 ```
 
 Output: Ranked table to stdout, sorted by confidence descending.
 
-### `automated_trader.py` — Paper trading
+### `automated-trader` — Paper trading
 
 ```bash
 # Single cycle, dry run (signals only)
-python automated_trader.py --tickers AAPL TSLA --dry-run --once
+uv run automated-trader --tickers AAPL TSLA --dry-run --once
 
 # Continuous every 5 minutes, market hours only
-python automated_trader.py --tickers AAPL MSFT NVDA --interval 300 --market-hours
+uv run automated-trader --tickers AAPL MSFT NVDA --interval 300 --market-hours
 
 # With AI signals
-python automated_trader.py --tickers AAPL --ai --interval 600
+uv run automated-trader --tickers AAPL --ai --interval 600
 ```
 
 Output: `results/live_YYYYMMDD_HHMMSS/portfolio_state.json` + `trades.csv`
+
+---
+
+## REST API
+
+Start the server:
+
+```bash
+uv run uvicorn prediction_trading.api.main:app --reload
+# Interactive docs at http://localhost:8000/docs
+```
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Liveness check |
+| `/predict/` | POST | Single-ticker prediction |
+| `/scan/` | POST | Parallel watchlist scan |
+| `/backtest/` | POST | Bar-by-bar backtest |
+| `/trading/start` | POST | Initialise AutoTrader session |
+| `/trading/status` | GET | Current AutoTrader state |
+
+Example with `curl`:
+
+```bash
+curl -s -X POST http://localhost:8000/predict/ \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL", "lookback_days": 365}' | python3 -m json.tool
+```
 
 ---
 
@@ -112,7 +140,7 @@ Output: `results/live_YYYYMMDD_HHMMSS/portfolio_state.json` + `trades.csv`
 The fastest path for scripting or Jupyter notebooks:
 
 ```python
-from src import PredictionTradingSystem
+from prediction_trading import PredictionTradingSystem
 
 # Predict
 system = PredictionTradingSystem("AAPL")
@@ -130,7 +158,7 @@ result = system2.backtest("2023-01-01", "2024-01-01")
 print(result.summary())
 
 # Multi-ticker scan
-from src.scanner import WatchlistScanner
+from prediction_trading.scanner import WatchlistScanner
 scanner = WatchlistScanner(min_confidence=0.4, workers=8)
 results = scanner.scan(["AAPL", "MSFT", "NVDA", "TSLA", "META"])
 for r in results:
@@ -153,7 +181,7 @@ for r in results:
 ### Via the API
 
 ```python
-from src import PredictionTradingSystem
+from prediction_trading import PredictionTradingSystem
 
 system = PredictionTradingSystem(
     "AAPL",
@@ -167,7 +195,7 @@ print(f"Return:       {stats['return_pct']:+.2f}%")
 print(f"Max Drawdown: {stats['max_drawdown_pct']:.2f}%")
 print(f"Win Rate:     {stats['win_rate_pct']:.1f}%")
 print(f"Profit Factor:{stats['profit_factor']:.2f}")
-print(f"Total Trades: {stats['total_trades']}")
+print(f"Total Trades: {stats['trades']}")
 
 out = system.save_report(result=result)
 print(f"Report: {out}")
@@ -196,10 +224,10 @@ print(f"Report: {out}")
 
 ```bash
 # Paper trading, one cycle
-python automated_trader.py --tickers AAPL MSFT --dry-run --once
+uv run automated-trader --tickers AAPL MSFT --dry-run --once
 
 # Continuous, every 5 minutes, persist state
-python automated_trader.py --tickers AAPL MSFT NVDA --interval 300
+uv run automated-trader --tickers AAPL MSFT NVDA --interval 300
 ```
 
 ### State persistence
@@ -211,8 +239,8 @@ Portfolio state is saved to `results/live_*/portfolio_state.json` after each cyc
 Implement `BaseBroker`:
 
 ```python
-from src.trading.broker import BaseBroker, Order, Fill
-from src.trading.portfolio import Trade
+from prediction_trading.trading.broker import BaseBroker, Order, Fill
+from prediction_trading.trading.portfolio import Trade
 
 class MyBroker(BaseBroker):
     def get_quote(self, ticker: str) -> float:
@@ -241,7 +269,7 @@ trader.run()
 The scanner is optimised for fast screening — it skips chart generation and AI calls.
 
 ```python
-from src.scanner import WatchlistScanner
+from prediction_trading.scanner import WatchlistScanner
 
 scanner = WatchlistScanner(
     categories=("trend", "momentum"),   # only score these categories
@@ -321,8 +349,8 @@ Enable in config:
 ```yaml
 ai:
   enabled: true
-  model: claude-sonnet-4-6
-  timeframe: 1w
+  model: claude-opus-4-7
+  timeframe: 1m
   max_tokens: 2000
 ```
 
@@ -369,4 +397,4 @@ See [Switching to a real broker](#switching-to-a-real-broker) above.
 
 ### Adding a new report format
 
-Subclass `BaseReportWriter` and `BaseChart` from `src/reporting/base.py`. Follow the pattern in `PredictionReportWriter` and `PredictionChart`.
+Subclass `BaseReportWriter` and `BaseChart` from `prediction_trading/reporting/base.py`. Follow the pattern in `PredictionReportWriter` and `PredictionChart`.

@@ -1,6 +1,6 @@
 # Examples
 
-Five annotated end-to-end examples. All run offline except where AI or live market data is noted.
+Six annotated end-to-end examples. All run offline except where AI or live market data is noted.
 
 ---
 
@@ -9,8 +9,8 @@ Five annotated end-to-end examples. All run offline except where AI or live mark
 Predict AAPL using technical indicators only. No API key needed.
 
 ```python
-from src import PredictionTradingSystem
-from src.prediction import SignalScorer
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.prediction import SignalScorer
 
 # 1. Create system — loads config/default.yaml
 system = PredictionTradingSystem("AAPL")
@@ -59,10 +59,9 @@ Uses Claude for narrative analysis and the new 4H timeframe confluence signal.
 **Requires:** `ANTHROPIC_API_KEY` in `.env` and live internet access.
 
 ```python
-from src import PredictionTradingSystem
-from src.data_fetcher import DataFetcher
-from src.indicators import TechnicalIndicators
-from src.prediction import SignalScorer
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.indicators import TechnicalIndicators
 
 # 1. System with AI enabled
 system = PredictionTradingSystem("NVDA", enable_ai=True)
@@ -117,7 +116,7 @@ system.save_report(prediction=prediction)
 Backtest TSLA over 2 years and analyse the results.
 
 ```python
-from src import PredictionTradingSystem
+from prediction_trading import PredictionTradingSystem
 
 system = PredictionTradingSystem(
     "TSLA",
@@ -135,8 +134,8 @@ print(f"Total Return:   {stats['return_pct']:+.2f}%")
 print(f"Max Drawdown:   {stats['max_drawdown_pct']:.2f}%")
 print(f"Win Rate:       {stats['win_rate_pct']:.1f}%")
 print(f"Profit Factor:  {stats.get('profit_factor', 'N/A')}")
-print(f"Total Trades:   {stats['total_trades']}")
-print(f"Wins / Losses:  {stats['winning_trades']} / {stats['losing_trades']}")
+print(f"Total Trades:   {stats['trades']}")
+print(f"Avg Win / Loss: ${stats['avg_win']:+.2f} / ${stats['avg_loss']:+.2f}")
 
 # Print trade details
 portfolio = result.portfolio
@@ -162,7 +161,7 @@ Screen a 20-ticker watchlist in parallel and export the results.
 
 ```python
 import csv
-from src.scanner import WatchlistScanner
+from prediction_trading.scanner import WatchlistScanner
 
 WATCHLIST = [
     "AAPL", "MSFT", "NVDA", "TSLA", "META",
@@ -217,8 +216,8 @@ Run two cycles of paper trading, persist state, then restore and inspect.
 
 ```python
 from pathlib import Path
-from src import PredictionTradingSystem
-from src.trading.state import StateStore
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.trading.state import StateStore
 
 STATE_PATH = "results/example_live/portfolio_state.json"
 TRADE_LOG = "results/example_live/trades.csv"
@@ -270,9 +269,9 @@ print(f"After cycle 2 — Equity: ${trader2.portfolio.equity({}):.2f}")
 ## Using Custom Indicator Categories
 
 ```python
-from src.prediction.signal_scorer import SignalScorer
-from src.indicators import TechnicalIndicators
-from src.data_fetcher import DataFetcher
+from prediction_trading.prediction.signal_scorer import SignalScorer
+from prediction_trading.indicators import TechnicalIndicators
+from prediction_trading.data_fetcher import DataFetcher
 
 fetcher = DataFetcher()
 market = fetcher.fetch("SPY")
@@ -288,4 +287,48 @@ signal = scorer.score(df, fundamentals=market.fundamentals)
 print(f"SPY: {signal.direction} ({signal.confidence:.0%}) — {signal.net_points} pts")
 print(f"Bullish factors: {[f.name for f in signal.bullish_factors]}")
 print(f"Bearish factors: {[f.name for f in signal.bearish_factors]}")
+```
+
+---
+
+## 6. REST API Client
+
+Call the FastAPI server programmatically. Start the server first:
+
+```bash
+uv run uvicorn prediction_trading.api.main:app --reload
+```
+
+```python
+import json, urllib.request
+
+BASE = "http://localhost:8000"
+
+def post(path, payload):
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        f"{BASE}{path}", data=data,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read())
+
+# Health check
+import urllib.request as _ur
+with _ur.urlopen(f"{BASE}/health") as r:
+    print(json.loads(r.read()))   # {"status": "ok"}
+
+# Single prediction
+pred = post("/predict/", {"ticker": "AAPL", "lookback_days": 365})
+print(f"{pred['ticker']}: {pred['direction']} ({pred['confidence']:.0%})")
+
+# Watchlist scan
+scan = post("/scan/", {"tickers": ["AAPL", "MSFT", "NVDA", "TSLA"], "workers": 4})
+for r in scan["results"]:
+    print(f"{r['ticker']:6} {r['direction']:8} {r['confidence']:.0%}")
+
+# Backtest
+bt = post("/backtest/", {"ticker": "AAPL", "start": "2023-01-01", "end": "2024-01-01"})
+stats = bt["stats"]
+print(f"Return: {stats['return_pct']:+.2f}%  Trades: {stats['trades']}")
 ```

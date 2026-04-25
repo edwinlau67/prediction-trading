@@ -4,24 +4,27 @@
 
 ```bash
 # Web UI (recommended)
-streamlit run app.py
+uv run streamlit run frontend/app.py
+
+# REST API server
+uv run uvicorn prediction_trading.api.main:app --reload
 
 # CLI — prediction
-python stock_predictor.py --tickers AAPL TSLA --timeframe 1w
-python stock_predictor.py --tickers NVDA --no-ai --indicators trend momentum
+uv run stock-predictor --tickers AAPL TSLA --timeframe 1m
+uv run stock-predictor --tickers NVDA --no-ai --indicators trend momentum
 
 # CLI — watchlist scan
-python scan_watchlist.py AAPL MSFT NVDA TSLA --min-confidence 0.4 --workers 8
+uv run scan-watchlist AAPL MSFT NVDA TSLA --min-confidence 0.4 --workers 8
 
 # CLI — paper trading
-python automated_trader.py --tickers AAPL TSLA --dry-run --once
-python automated_trader.py --tickers AAPL --interval 300 --market-hours
+uv run automated-trader --tickers AAPL TSLA --dry-run --once
+uv run automated-trader --tickers AAPL --interval 300 --market-hours
 
 # Tests (offline, no API key)
-pytest tests/ -v
+uv run pytest backend/tests/ -v
 
 # Single test file
-pytest tests/test_signal_scorer.py -v
+uv run pytest backend/tests/test_signal_scorer.py -v
 ```
 
 ---
@@ -77,9 +80,9 @@ signals:
   ai_weight: 0.50                # 0=rule-only, 1=AI-only
 
 ai:
-  enabled: false                 # set true + ANTHROPIC_API_KEY to use Claude
-  model: claude-sonnet-4-6
-  timeframe: 1w
+  enabled: true                  # set ANTHROPIC_API_KEY to use Claude
+  model: claude-opus-4-7
+  timeframe: 1m
 ```
 
 ---
@@ -99,8 +102,8 @@ Apply in Settings page or directly in `config/default.yaml` → `config/risk_pro
 ## Python API Cheat Sheet
 
 ```python
-from src import PredictionTradingSystem
-from src.scanner import WatchlistScanner
+from prediction_trading import PredictionTradingSystem
+from prediction_trading.scanner import WatchlistScanner
 
 # Predict
 sys = PredictionTradingSystem("AAPL")
@@ -164,7 +167,7 @@ results/
 | Variable | Required | Description |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Only for AI | `sk-ant-...` |
-| `CLAUDE_MODEL` | No | Override model (default: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | No | Override model (default: `claude-opus-4-7`) |
 
 ---
 
