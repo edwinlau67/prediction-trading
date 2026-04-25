@@ -22,6 +22,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+from ..data_fetcher import MacroContext, NewsContext, SectorContext
 from .factor import ALL_CATEGORIES, Direction, Factor, IndicatorCategory
 
 
@@ -99,6 +100,9 @@ class SignalScorer:
         weekly: pd.DataFrame | None = None,
         hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
+        news_context: NewsContext | None = None,
+        macro_context: MacroContext | None = None,
+        sector_context: SectorContext | None = None,
     ) -> ScoredSignal:
         if df.empty:
             return ScoredSignal(direction="neutral", confidence=0.0)
@@ -122,6 +126,12 @@ class SignalScorer:
             factors.extend(self._support_factors(df))
         if "fundamental" in self.categories and fundamentals:
             factors.extend(self._fundamental_factors(fundamentals))
+        if "news" in self.categories and news_context is not None:
+            factors.extend(self._news_factors(news_context))
+        if "macro" in self.categories and macro_context is not None:
+            factors.extend(self._macro_factors(macro_context))
+        if "sector" in self.categories and sector_context is not None:
+            factors.extend(self._sector_factors(sector_context))
 
         net = sum(f.signed for f in factors)
 
@@ -440,6 +450,79 @@ class SignalScorer:
              bull_fn=lambda v: 0 < v < 2,
              bear_fn=lambda v: v > 8,
              fmt=lambda v: f"P/B={v:.2f}")
+        return facs
+
+    # ------------------------------------------------------------ news rules
+    def _news_factors(self, ctx: NewsContext) -> list[Factor]:
+        facs: list[Factor] = []
+        s = ctx.sentiment_score
+        if s > 0.3:
+            facs.append(Factor("news", "Positive news sentiment", "bullish", 2,
+                               f"score={s:.2f}, {ctx.article_count} articles"))
+        elif s < -0.3:
+            facs.append(Factor("news", "Negative news sentiment", "bearish", 2,
+                               f"score={s:.2f}, {ctx.article_count} articles"))
+        if ctx.earnings_beat:
+            facs.append(Factor("news", "Earnings beat", "bullish", 2,
+                               "recent EPS actual > estimate"))
+        elif ctx.earnings_miss:
+            facs.append(Factor("news", "Earnings miss", "bearish", 2,
+                               "recent EPS actual < estimate"))
+        days = ctx.earnings_upcoming_days
+        if days is not None and days <= 7:
+            facs.append(Factor("news", "Earnings risk", "neutral", 0,
+                               f"earnings in {days}d — binary event risk"))
+        return facs
+
+    # ------------------------------------------------------------ macro rules
+    def _macro_factors(self, ctx: MacroContext) -> list[Factor]:
+        facs: list[Factor] = []
+        vix = ctx.vix
+        if vix is not None:
+            if vix < 15:
+                facs.append(Factor("macro", "Low volatility regime", "bullish", 1,
+                                   f"VIX={vix:.1f} < 15"))
+            elif 25 <= vix <= 35:
+                facs.append(Factor("macro", "Elevated market fear", "bearish", 1,
+                                   f"VIX={vix:.1f}"))
+            elif vix > 35:
+                facs.append(Factor("macro", "Market panic (VIX >35)", "bearish", 2,
+                                   f"VIX={vix:.1f}"))
+        spread = ctx.yield_spread
+        if spread is not None:
+            if spread > 0.2:
+                facs.append(Factor("macro", "Normal yield curve", "bullish", 1,
+                                   f"10Y-2Y={spread:.2f}%"))
+            elif spread < -0.2:
+                facs.append(Factor("macro", "Inverted yield curve", "bearish", 1,
+                                   f"10Y-2Y={spread:.2f}%"))
+        if ctx.spy_above_sma50 is True:
+            facs.append(Factor("macro", "Broad market uptrend", "bullish", 1,
+                               "SPY above 50-day SMA"))
+        elif ctx.spy_above_sma50 is False:
+            facs.append(Factor("macro", "Broad market downtrend", "bearish", 1,
+                               "SPY below 50-day SMA"))
+        return facs
+
+    # ----------------------------------------------------------- sector rules
+    def _sector_factors(self, ctx: SectorContext) -> list[Factor]:
+        facs: list[Factor] = []
+        vs = ctx.vs_sector
+        if vs is not None:
+            if vs > 0.03:
+                facs.append(Factor("sector", "Outperforming sector", "bullish", 1,
+                                   f"stock +{vs*100:.1f}% vs {ctx.sector_etf}"))
+            elif vs < -0.03:
+                facs.append(Factor("sector", "Underperforming sector", "bearish", 1,
+                                   f"stock {vs*100:.1f}% vs {ctx.sector_etf}"))
+        sv = ctx.sector_vs_spy
+        if sv is not None:
+            if sv > 0.02:
+                facs.append(Factor("sector", "Sector leading market", "bullish", 1,
+                                   f"{ctx.sector_etf} +{sv*100:.1f}% vs SPY"))
+            elif sv < -0.02:
+                facs.append(Factor("sector", "Sector lagging market", "bearish", 1,
+                                   f"{ctx.sector_etf} {sv*100:.1f}% vs SPY"))
         return facs
 
     # ---------------------------------------------------------- helpers

@@ -113,4 +113,5 @@ def test_crossover_detection_emits_cross_events(ohlcv_uptrend):
 def test_all_categories_present_by_default():
     assert set(ALL_CATEGORIES) == {
         "trend", "momentum", "volatility", "volume", "support", "fundamental",
+        "news", "macro", "sector",
     }
