@@ -94,11 +94,17 @@ analysis that:
 1. Restates direction, confidence, current price, and price target.
 2. Lists up to 5 bullish factors and up to 5 bearish/risk factors using the
    tool's key_factors and the fundamentals it returned.
-3. Notes the risk level and what could invalidate the thesis.
-4. Ends with a 2-4 sentence narrative.
+3. If the tool result includes a "news" field, cite the sentiment score and
+   any recent earnings beat/miss or upcoming earnings risk.
+4. If the tool result includes a "macro" field, comment on the VIX regime
+   and yield curve shape as a tailwind or headwind.
+5. If the tool result includes a "sector" field, state whether the stock is
+   outperforming or underperforming its sector ETF over 30 days.
+6. Notes the risk level and what could invalidate the thesis.
+7. Ends with a 2-4 sentence narrative.
 
 Do not invent numbers. Use only values returned by the tool. Keep the
-response under 400 words.
+response under 500 words.
 """
 
 _log = logging.getLogger(__name__)
@@ -162,14 +168,18 @@ class AIPredictor:
         Returns the same schema Claude sees so offline callers can consume
         it directly.
         """
-        market = self.data_fetcher.fetch(ticker, lookback_days=365)
+        market = self.data_fetcher.fetch(ticker, lookback_days=365, include_enriched=True)
         return self._predict_from_market(market, timeframe)
 
     def _predict_from_market(self, market: MarketData, timeframe: str
                              ) -> dict[str, Any]:
         df = TechnicalIndicators.compute_all(market.ohlcv)
         score = SignalScorer(categories=self.categories).score(
-            df, fundamentals=market.fundamentals,
+            df,
+            fundamentals=market.fundamentals,
+            news_context=market.news_context,
+            macro_context=market.macro_context,
+            sector_context=market.sector_context,
         )
 
         row = df.iloc[-1]
@@ -203,6 +213,37 @@ class AIPredictor:
             f"(confidence {score.confidence:.0%})"
         ]
 
+        enriched: dict[str, Any] = {}
+        nc = market.news_context
+        if nc is not None:
+            enriched["news"] = {
+                "sentiment_score": nc.sentiment_score,
+                "article_count": nc.article_count,
+                "recent_headlines": nc.recent_headlines,
+                "earnings_beat": nc.earnings_beat,
+                "earnings_miss": nc.earnings_miss,
+                "earnings_upcoming_days": nc.earnings_upcoming_days,
+            }
+        mc = market.macro_context
+        if mc is not None:
+            enriched["macro"] = {
+                "vix": mc.vix,
+                "yield_10y": mc.yield_10y,
+                "yield_2y": mc.yield_2y,
+                "yield_spread": mc.yield_spread,
+                "spy_above_sma50": mc.spy_above_sma50,
+            }
+        sc = market.sector_context
+        if sc is not None:
+            enriched["sector"] = {
+                "sector": sc.sector,
+                "sector_etf": sc.sector_etf,
+                "stock_30d_return_pct": round(sc.stock_30d_return * 100, 2) if sc.stock_30d_return is not None else None,
+                "sector_30d_return_pct": round(sc.sector_30d_return * 100, 2) if sc.sector_30d_return is not None else None,
+                "vs_sector_pct": round(sc.vs_sector * 100, 2) if sc.vs_sector is not None else None,
+                "sector_vs_spy_pct": round(sc.sector_vs_spy * 100, 2) if sc.sector_vs_spy is not None else None,
+            }
+
         return {
             "ticker": market.ticker,
             "timeframe": timeframe,
@@ -219,6 +260,7 @@ class AIPredictor:
             "scoring_components": score.components,
             "category_points": score.category_points,
             "indicators": sorted(self.categories),
+            **enriched,
         }
 
     # ---------------------------------------------------------------- Claude
