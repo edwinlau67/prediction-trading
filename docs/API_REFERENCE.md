@@ -83,7 +83,7 @@ class WatchlistScanner:
     def __init__(
         self,
         *,
-        categories: tuple[str, ...] | None = None,  # default: all 6 categories
+        categories: tuple[str, ...] | None = None,  # default: all 9 categories
         lookback_days: int = 365,
         min_confidence: float = 0.0,
         workers: int = 4,
@@ -116,7 +116,7 @@ class SignalScorer:
     def __init__(
         self,
         *,
-        categories: Iterable[str] | None = None,   # default: all 6
+        categories: Iterable[str] | None = None,   # default: all 9
         multi_timeframe_bonus: int = 2,
         confidence_scale: float = 10.0,
         weights: dict[str, float] | None = None,   # legacy; kept for API compat
@@ -126,22 +126,28 @@ class SignalScorer:
         self,
         df: pd.DataFrame,            # daily OHLCV enriched by TechnicalIndicators.compute_all()
         *,
-        weekly: pd.DataFrame | None = None,     # weekly resampled + enriched (for confluence)
-        hourly_4h: pd.DataFrame | None = None,  # 4H enriched (for confluence); new in v1.1
-        fundamentals: dict | None = None,       # yfinance fundamentals dict
+        weekly: pd.DataFrame | None = None,          # weekly resampled + enriched (for confluence)
+        hourly_4h: pd.DataFrame | None = None,       # 4H enriched (for confluence)
+        fundamentals: dict | None = None,            # yfinance fundamentals dict
+        news_context: NewsContext | None = None,     # from DataFetcher.fetch_news_context()
+        macro_context: MacroContext | None = None,   # from DataFetcher.fetch_macro_context()
+        sector_context: SectorContext | None = None, # from DataFetcher.fetch_sector_context()
     ) -> ScoredSignal
 ```
 
 **Indicator categories:**
 
-| Category | Rules fired |
-|---|---|
-| `trend` | Price vs SMA50/200, Golden/Death Cross, MACD crossover, EMA12 vs EMA26 |
-| `momentum` | RSI bands (30/70), RSI midline (50), Stochastic cross, Stochastic bands |
-| `volatility` | Bollinger Band touches, ATR regime (elevated/calm) |
-| `volume` | OBV trend, Volume spike direction |
-| `support` | Price vs Pivot Point, Trendline hold/break |
-| `fundamental` | P/E, PEG, Revenue growth, Earnings growth, Net margin, ROE, D/E, Current ratio, P/B |
+| Category | Rules fired | Points |
+|---|---|---|
+| `trend` | Price vs SMA50/200, Golden/Death Cross, MACD crossover, EMA12 vs EMA26 | ±1 to ±2 |
+| `momentum` | RSI bands (30/70), RSI midline (50), Stochastic cross, Stochastic bands | ±1 to ±2 |
+| `volatility` | Bollinger Band touches, ATR regime (elevated/calm) | ±1 |
+| `volume` | OBV trend, Volume spike direction | ±1 |
+| `support` | Price vs Pivot Point, Trendline hold/break | ±1 |
+| `fundamental` | P/E, PEG, Revenue growth, Earnings growth, Net margin, ROE, D/E, Current ratio, P/B | ±1 each |
+| `news` | Sentiment score (keyword ratio), earnings beat/miss, upcoming earnings | ±2 / 0 |
+| `macro` | VIX regime, yield curve spread (10Y−2Y), SPY vs SMA50 | ±1 to ±2 |
+| `sector` | Stock vs sector ETF (30d), sector ETF vs SPY (30d) | ±1 |
 
 ---
 
@@ -482,12 +488,42 @@ class Backtester:
 
 ```python
 @dataclass
+class NewsContext:
+    sentiment_score: float           # −1.0..1.0 keyword-ratio score
+    article_count: int
+    recent_headlines: list[str]      # up to 5 headlines
+    earnings_beat: bool | None       # None = no recent data
+    earnings_miss: bool | None
+    earnings_upcoming_days: int | None  # None = not within 30 days
+
+@dataclass
+class MacroContext:
+    vix: float | None
+    yield_10y: float | None
+    yield_2y: float | None
+    yield_spread: float | None       # 10Y − 2Y
+    spy_above_sma50: bool | None
+
+@dataclass
+class SectorContext:
+    sector: str                      # e.g. "Technology"
+    sector_etf: str                  # e.g. "XLK"
+    stock_30d_return: float | None
+    sector_30d_return: float | None
+    spy_30d_return: float | None
+    vs_sector: float | None          # stock_30d − sector_30d
+    sector_vs_spy: float | None      # sector_30d − spy_30d
+
+@dataclass
 class MarketData:
     ticker: str
     ohlcv: pd.DataFrame          # columns: Open, High, Low, Close, Volume
     current_price: float
     fundamentals: dict
     interval: str = "1d"
+    news_context: NewsContext | None = None
+    macro_context: MacroContext | None = None
+    sector_context: SectorContext | None = None
     as_of: pd.Timestamp          # property: last bar timestamp
 
 class DataFetcher:
@@ -503,11 +539,21 @@ class DataFetcher:
 
     def fetch_fundamentals(self, ticker: str) -> dict
 
+    def fetch_news_context(self, ticker: str) -> NewsContext
+        # Keyword-based sentiment from yfinance news; earnings dates from earnings_dates + calendar
+
+    def fetch_macro_context(self) -> MacroContext
+        # VIX (^VIX), 10Y yield (^TNX), 2Y yield (^IRX), SPY 50-SMA from yfinance
+
+    def fetch_sector_context(self, ticker: str, stock_ohlcv: pd.DataFrame) -> SectorContext
+        # Sector ETF mapped from yfinance .info["sector"]; 30-day returns vs SPY
+
     def fetch(
         self,
         ticker: str,
         lookback_days: int = 365,
         include_fundamentals: bool = True,
+        include_enriched: bool = False,  # set True to populate news/macro/sector contexts
     ) -> MarketData
 ```
 
@@ -517,9 +563,13 @@ class DataFetcher:
 
 ```python
 Direction = Literal["bullish", "bearish", "neutral"]
-IndicatorCategory = Literal["trend", "momentum", "volatility", "volume", "support", "fundamental"]
+IndicatorCategory = Literal[
+    "trend", "momentum", "volatility", "volume", "support", "fundamental",
+    "news", "macro", "sector",
+]
 ALL_CATEGORIES: tuple[IndicatorCategory, ...] = (
-    "trend", "momentum", "volatility", "volume", "support", "fundamental"
+    "trend", "momentum", "volatility", "volume", "support", "fundamental",
+    "news", "macro", "sector",
 )
 
 @dataclass

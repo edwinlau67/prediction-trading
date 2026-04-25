@@ -329,9 +329,16 @@ Filter to specific categories for faster runs or to test isolated signals:
 ```yaml
 indicators:
   categories:
-    - trend      # SMA/EMA/MACD/Golden Cross
-    - momentum   # RSI/Stochastic
-    # comment out volatility, volume, support, fundamental to exclude
+    - trend       # SMA/EMA/MACD/Golden Cross
+    - momentum    # RSI/Stochastic
+    - volatility  # Bollinger/ATR
+    - volume      # OBV/Volume spike
+    - support     # Pivot points/Trendlines
+    - fundamental # P/E, ROE, margins…
+    - news        # Headline sentiment, earnings beat/miss (requires internet)
+    - macro       # VIX, yield curve, SPY trend (requires internet)
+    - sector      # Sector ETF relative strength (requires internet)
+    # Comment out any category to exclude it from scoring
 ```
 
 ---
@@ -362,8 +369,8 @@ system = PredictionTradingSystem("AAPL", enable_ai=True, api_key="sk-ant-...")
 ### How it works
 
 1. System prompt (cached with `cache_control: ephemeral`) instructs Claude to call the `stock_prediction` tool.
-2. Claude calls the tool → local code runs `SignalScorer` and fetches data → returns structured result.
-3. Second API call: Claude receives tool result and returns a narrative analysis.
+2. Claude calls the tool → local code fetches data with `include_enriched=True` (adds news, macro, sector context) and runs `SignalScorer` → returns structured result with optional `news`, `macro`, `sector` dicts.
+3. Second API call: Claude receives tool result and returns a narrative (≤500 words) that comments on news sentiment/earnings, VIX/yield-curve, and sector relative strength when those fields are present.
 4. `UnifiedPredictor` blends the AI confidence with the rule-based score.
 
 ### Prompt caching

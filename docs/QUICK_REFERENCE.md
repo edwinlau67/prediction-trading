@@ -39,6 +39,9 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 | `volume` | OBV rising/falling, Volume spike on up/down day | ±1 |
 | `support` | Price vs Pivot Point, Trendline hold / break | ±1 |
 | `fundamental` | P/E, PEG, Rev/Earnings growth, Net margin, ROE, D/E, Current ratio, P/B | ±1 each |
+| `news` | Headline sentiment (keyword ratio), earnings beat/miss | ±2 |
+| `macro` | VIX regime, yield curve spread (10Y−2Y), SPY vs SMA50 | ±1 to ±2 |
+| `sector` | Stock vs sector ETF (30d), sector ETF vs SPY (30d) | ±1 |
 | *(bonus)* | Weekly timeframe agrees with daily | ±2 |
 | *(bonus)* | 4H timeframe agrees with daily | ±1 |
 

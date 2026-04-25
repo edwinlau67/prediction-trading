@@ -277,7 +277,9 @@ fetcher = DataFetcher()
 market = fetcher.fetch("SPY")
 df = TechnicalIndicators.compute_all(market.ohlcv)
 
-# Score using only trend and volume (ignore momentum, volatility, support, fundamental)
+# Score using only trend and volume (ignore all other categories)
+# Available categories: trend, momentum, volatility, volume, support, fundamental,
+#                       news, macro, sector
 scorer = SignalScorer(
     categories=("trend", "volume"),
     confidence_scale=6.0,       # lower scale → higher confidence with fewer rules

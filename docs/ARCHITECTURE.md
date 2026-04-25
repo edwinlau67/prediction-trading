@@ -97,10 +97,10 @@ AutoTrader.run(interval_seconds=300)
 The top-level façade. Reads `config/default.yaml`, instantiates all sub-components, and exposes a high-level API. Every CLI and UI page goes through this class.
 
 ### `prediction_trading/prediction/signal_scorer.py — SignalScorer`
-Point-based rule engine. Six indicator categories emit `Factor` objects (±1 to ±2 points each). Net points → direction + confidence (`min(1.0, |net| / confidence_scale)`). Multi-timeframe bonuses applied for weekly and 4H agreement.
+Point-based rule engine. Nine indicator categories emit `Factor` objects (±1 to ±2 points each). Net points → direction + confidence (`min(1.0, |net| / confidence_scale)`). Multi-timeframe bonuses applied for weekly and 4H agreement. The `news`, `macro`, and `sector` categories are activated when the corresponding context objects (`NewsContext`, `MacroContext`, `SectorContext`) are passed to `score()`.
 
 ### `prediction_trading/prediction/ai_predictor.py — AIPredictor`
-Claude tool-use loop. The model calls `stock_prediction` tool → local execution runs `SignalScorer` → second API call returns a narrative. System prompt uses `cache_control: ephemeral` for prompt caching (~10% cost on cache hits).
+Claude tool-use loop. The model calls `stock_prediction` tool → local execution runs `DataFetcher.fetch(include_enriched=True)` and `SignalScorer` (with news/macro/sector contexts) → tool result includes optional `news`, `macro`, `sector` dicts → second API call returns a narrative (≤500 words). System prompt uses `cache_control: ephemeral` for prompt caching (~10% cost on cache hits).
 
 ### `prediction_trading/prediction/predictor.py — UnifiedPredictor`
 Fuses rule and AI signals: `blended = (1 - ai_weight) × rule_signed + ai_weight × ai_signed`. Falls back to rule-only when AI is disabled or unavailable.
@@ -121,7 +121,7 @@ JSON-backed persistence. `load_or_create()` restores the portfolio across restar
 Bar-by-bar simulation with 200-bar indicator warmup. Checks exits (stop/target) before scoring each bar to prevent look-ahead bias.
 
 ### `prediction_trading/data_fetcher.py — DataFetcher`
-Thin wrapper around `yfinance`. Normalises MultiIndex columns, removes NaN rows, and returns `MarketData`.
+Thin wrapper around `yfinance`. Normalises MultiIndex columns, removes NaN rows, and returns `MarketData`. When `include_enriched=True`, also populates `MarketData.news_context` (`NewsContext`), `macro_context` (`MacroContext`), and `sector_context` (`SectorContext`) via three additional yfinance calls. Enriched fetching is only used by `AIPredictor`; the rule-based path uses the default `include_enriched=False`.
 
 ### `prediction_trading/scanner.py — WatchlistScanner`
 `ThreadPoolExecutor`-based parallel screening. Reuses `SignalScorer` without charts or reporting for low-latency bulk scanning.
@@ -152,7 +152,10 @@ Values in `default.yaml` can be overridden at `PredictionTradingSystem` instanti
 Each rule emits an integer point value, making the score auditable — you can read exactly which factors drove the direction. The old weighted-component model is preserved as a `components` dict for backwards compatibility with the backtester.
 
 ### Factor as lingua franca
-`Factor(category, name, direction, points, detail)` is the unit of information flowing between scoring, charts, and reports. Charts render factor bars; reports render factor lists; the AI prompt lists the top factors.
+`Factor(category, name, direction, points, detail)` is the unit of information flowing between scoring, charts, and reports. Charts render factor bars; reports render factor lists; the AI prompt lists the top factors. The `news`, `macro`, and `sector` categories follow the same `Factor` pattern and appear in the same factor lists and bar charts as the technical categories.
+
+### Enriched context only on the AI path
+`DataFetcher.fetch(include_enriched=True)` makes three extra yfinance calls (news headlines, macro index symbols, sector ETF prices). This is called exclusively by `AIPredictor.predict()` so the rule-based scanner and backtester remain fast and offline-compatible.
 
 ### Prompt caching
 `AIPredictor` pins the system prompt with `cache_control: ephemeral`. A typical run sends ~1 500 cached tokens + ~200 uncached, reducing cost by ~90% on repeated calls.
