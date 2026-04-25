@@ -9,6 +9,9 @@ venv/
 .coverage
 htmlcov/
 
+# uv — lock file is committed; only ignore the managed env
+# uv.lock  ← do NOT ignore; keep this committed
+
 results/
 logs/
 *.log
