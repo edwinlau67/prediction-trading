@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.data_fetcher import MarketData
-from src.scanner import ScanResult, WatchlistScanner
+from prediction_trading.data_fetcher import MarketData
+from prediction_trading.scanner import ScanResult, WatchlistScanner
 
 
 def _make_market(ohlcv) -> MarketData:
@@ -21,7 +21,7 @@ def _make_market(ohlcv) -> MarketData:
 @pytest.fixture
 def mock_fetcher(ohlcv_uptrend):
     market = _make_market(ohlcv_uptrend)
-    with patch("src.scanner.DataFetcher") as MockFetcher:
+    with patch("prediction_trading.scanner.DataFetcher") as MockFetcher:
         instance = MockFetcher.return_value
         instance.fetch.return_value = market
         yield instance
@@ -50,7 +50,7 @@ def test_scan_min_confidence_filters(mock_fetcher):
 
 
 def test_scan_isolates_errors():
-    with patch("src.scanner.DataFetcher") as MockFetcher:
+    with patch("prediction_trading.scanner.DataFetcher") as MockFetcher:
         instance = MockFetcher.return_value
         instance.fetch.side_effect = RuntimeError("network error")
         scanner = WatchlistScanner()

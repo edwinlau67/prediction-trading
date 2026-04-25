@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.trading.portfolio import Portfolio, Position
+from prediction_trading.trading.portfolio import Portfolio, Position
 
 
 def _pos(ticker: str, price: float, qty: int, when: datetime, side: str = "long") -> Position:

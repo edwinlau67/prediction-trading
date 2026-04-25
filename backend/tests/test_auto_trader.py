@@ -12,9 +12,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.data_fetcher import MarketData
-from src.prediction import Prediction
-from src.trading import (
+from prediction_trading.data_fetcher import MarketData
+from prediction_trading.prediction import Prediction
+from prediction_trading.trading import (
     AutoTrader,
     MarketHours,
     Order,
@@ -190,7 +190,7 @@ def test_auto_trader_closes_on_stop_loss(ohlcv_uptrend):
     entry_price = float(ohlcv_uptrend["Close"].iloc[-1])
     portfolio.cash = 10_000.0
     # seed an open long position that will breach stop once quote drops
-    from src.trading.portfolio import Position
+    from prediction_trading.trading.portfolio import Position
     portfolio.open(Position(
         ticker="AAPL", side="long", quantity=10,
         entry_price=entry_price,

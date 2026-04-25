@@ -1,14 +1,9 @@
 """Shared fixtures: synthetic OHLCV generator so tests don't hit Yahoo Finance."""
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def _synthetic_ohlcv(bars: int = 400, seed: int = 7,

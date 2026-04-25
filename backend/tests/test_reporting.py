@@ -9,12 +9,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.reporting.report import ReportWriter
+from prediction_trading.reporting.report import ReportWriter
 
 
 def _minimal_prediction(ticker: str = "AAPL", direction: str = "bullish"):
-    from src.prediction.predictor import Prediction
-    from src.prediction.factor import Factor
+    from prediction_trading.prediction.predictor import Prediction
+    from prediction_trading.prediction.factor import Factor
     return Prediction(
         ticker=ticker, direction=direction, confidence=0.7,
         current_price=175.0, price_target=185.0,
@@ -26,8 +26,8 @@ def _minimal_prediction(ticker: str = "AAPL", direction: str = "bullish"):
 
 
 def _minimal_backtest_result(ticker: str = "AAPL"):
-    from src.backtest.backtester import BacktestResult
-    from src.trading.portfolio import Portfolio
+    from prediction_trading.backtest.backtester import BacktestResult
+    from prediction_trading.trading.portfolio import Portfolio
     portfolio = Portfolio(initial_capital=10_000.0)
     result = BacktestResult(
         ticker=ticker,
@@ -97,7 +97,7 @@ class TestReportWriter:
 
 class TestPredictionReportWriter:
     def test_write_predictions_md(self):
-        from src.reporting.prediction_report import PredictionReportEntry, PredictionReportWriter
+        from prediction_trading.reporting.prediction_report import PredictionReportEntry, PredictionReportWriter
 
         rng = np.random.default_rng(1)
         close = 100.0 * np.exp(np.cumsum(rng.normal(0.001, 0.01, 50)))
@@ -123,7 +123,7 @@ class TestPredictionReportWriter:
             assert "AAPL" in content
 
     def test_run_dir_prefix_is_predict(self):
-        from src.reporting.prediction_report import PredictionReportWriter
+        from prediction_trading.reporting.prediction_report import PredictionReportWriter
         with tempfile.TemporaryDirectory() as tmp:
             writer = PredictionReportWriter(out_root=tmp)
             run_dir = writer.new_run_dir()

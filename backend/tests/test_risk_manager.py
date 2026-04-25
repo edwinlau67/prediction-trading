@@ -2,9 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from src.prediction.predictor import Prediction
-from src.trading.portfolio import Portfolio, Position
-from src.trading.risk_manager import RiskManager
+from prediction_trading.prediction.predictor import Prediction
+from prediction_trading.trading.portfolio import Portfolio, Position
+from prediction_trading.trading.risk_manager import RiskManager
 
 
 _TS = datetime(2024, 6, 1, 10, 0)

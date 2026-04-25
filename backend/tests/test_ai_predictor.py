@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.prediction.ai_predictor import AIPredictor, AIPrediction
+from prediction_trading.prediction.ai_predictor import AIPredictor, AIPrediction
 
 
 def _make_ohlcv(n: int = 250) -> pd.DataFrame:
@@ -22,9 +22,9 @@ def _make_ohlcv(n: int = 250) -> pd.DataFrame:
 
 
 def _make_predictor(api_key: str | None = "sk-ant-fake") -> AIPredictor:
-    from src.data_fetcher import DataFetcher
+    from prediction_trading.data_fetcher import DataFetcher
     fetcher = MagicMock(spec=DataFetcher)
-    from src.data_fetcher import MarketData
+    from prediction_trading.data_fetcher import MarketData
     fetcher.fetch.return_value = MarketData(
         ticker="AAPL", ohlcv=_make_ohlcv(), current_price=175.0,
         fundamentals={"trailingPE": 28.0},
@@ -128,7 +128,7 @@ class TestDegradedMode:
     def test_no_api_key_returns_local_result(self):
         """Without an API key, AIPredictor should still return a valid AIPrediction
         derived from the local tool execution (no second API call)."""
-        from src.data_fetcher import DataFetcher, MarketData
+        from prediction_trading.data_fetcher import DataFetcher, MarketData
         fetcher = MagicMock(spec=DataFetcher)
         fetcher.fetch.return_value = MarketData(
             ticker="AAPL", ohlcv=_make_ohlcv(), current_price=175.0,

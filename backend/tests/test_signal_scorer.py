@@ -1,5 +1,5 @@
-from src.indicators import TechnicalIndicators
-from src.prediction import ALL_CATEGORIES, SignalScorer
+from prediction_trading.indicators import TechnicalIndicators
+from prediction_trading.prediction import ALL_CATEGORIES, SignalScorer
 
 
 def test_scorer_favours_uptrend(ohlcv_uptrend):

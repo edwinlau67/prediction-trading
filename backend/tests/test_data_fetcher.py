@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data_fetcher import DataFetcher, MarketData
+from prediction_trading.data_fetcher import DataFetcher, MarketData
 
 
 def _make_ohlcv(n: int = 50, start_price: float = 100.0) -> pd.DataFrame:

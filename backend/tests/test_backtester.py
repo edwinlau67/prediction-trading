@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from src.backtest import Backtester, BacktestResult
-from src.prediction import SignalScorer, UnifiedPredictor
-from src.trading import Portfolio, RiskManager
-from src.trading.portfolio import Trade
+from prediction_trading.backtest import Backtester, BacktestResult
+from prediction_trading.prediction import SignalScorer, UnifiedPredictor
+from prediction_trading.trading import Portfolio, RiskManager
+from prediction_trading.trading.portfolio import Trade
 
 
 def test_profit_factor_none_when_no_losses():

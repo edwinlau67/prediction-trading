@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.indicators import TechnicalIndicators, SupportResistance
+from prediction_trading.indicators import TechnicalIndicators, SupportResistance
 
 
 def test_sma_ema_match_manual(ohlcv_uptrend):

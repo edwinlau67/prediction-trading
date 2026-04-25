@@ -4,9 +4,9 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
 
-from src.prediction.predictor import UnifiedPredictor
-from src.prediction.ai_predictor import AIPrediction
-from src.prediction.signal_scorer import SignalScorer, ScoredSignal
+from prediction_trading.prediction.predictor import UnifiedPredictor
+from prediction_trading.prediction.ai_predictor import AIPrediction
+from prediction_trading.prediction.signal_scorer import SignalScorer, ScoredSignal
 
 
 def _make_scored(direction: str, confidence: float) -> ScoredSignal:
