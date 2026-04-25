@@ -13,7 +13,9 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from pathlib import Path
 
+from prediction_trading.prediction.factor import ALL_CATEGORIES
 from prediction_trading.scanner import WatchlistScanner
 
 _DEFAULT_TICKERS = [
@@ -21,14 +23,12 @@ _DEFAULT_TICKERS = [
     "GOOGL", "AMZN", "AMD", "INTC", "QCOM",
 ]
 
-_ALL_CATEGORIES = ("trend", "momentum", "volatility", "volume", "support", "fundamental")
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tickers", nargs="+", default=_DEFAULT_TICKERS)
-    parser.add_argument("--indicators", nargs="+", default=list(_ALL_CATEGORIES),
-                        choices=_ALL_CATEGORIES, metavar="CAT")
+    parser.add_argument("--indicators", nargs="+", default=list(ALL_CATEGORIES),
+                        choices=ALL_CATEGORIES, metavar="CAT")
     parser.add_argument("--min-confidence", type=float, default=0.0)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--csv", metavar="FILE", help="Export results to CSV file")
