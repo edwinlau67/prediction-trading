@@ -8,11 +8,13 @@
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
 - [Web UI](#web-ui)
+- [REST API](#rest-api)
 - [CLI Usage](#cli-usage)
-  - [stock\_predictor.py](#stock_predictorpy)
-  - [automated\_trader.py](#automated_traderpy)
-  - [scan\_watchlist.py](#scan_watchlistpy)
+  - [stock-predictor](#stock-predictor)
+  - [automated-trader](#automated-trader)
+  - [scan-watchlist](#scan-watchlist)
 - [Output Structure](#output-structure)
 - [Technical Indicators](#technical-indicators)
 - [Backtester](#backtester)
@@ -33,6 +35,7 @@
 - **Bar-by-bar backtester** with full performance reports and four chart panels
 - **Paper trading engine** with ATR-based risk management and portfolio persistence
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
+- **FastAPI REST API** with OpenAPI docs at `/docs`
 - **Streamlit web UI** with seven pages, live price badges, and light/dark theme
 
 ---
@@ -42,8 +45,9 @@
 ```bash
 git clone <this-repo> prediction-trading
 cd prediction-trading
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+
+# Install all packages (requires uv — https://docs.astral.sh/uv/)
+uv sync --all-packages
 
 # Optional — enable Claude AI predictions
 cp .env.example .env
@@ -53,7 +57,46 @@ cp .env.example .env
 Run a prediction without an API key:
 
 ```bash
-python stock_predictor.py --tickers AAPL --no-ai
+uv run stock-predictor --tickers AAPL --no-ai
+```
+
+Or use `make`:
+
+```bash
+make install      # uv sync --all-packages
+make test         # pytest backend/tests/
+make ui-dev       # streamlit run frontend/app.py
+make api-dev      # uvicorn on :8000
+```
+
+---
+
+## Project Structure
+
+```
+prediction-trading/
+├── backend/
+│   ├── src/prediction_trading/   # core Python package
+│   │   ├── _cli/                 # stock_predictor, automated_trader, scan_watchlist
+│   │   ├── api/                  # FastAPI app (routers: predict, scan, backtest, trading)
+│   │   ├── prediction/           # SignalScorer, AIPredictor, UnifiedPredictor
+│   │   ├── trading/              # Portfolio, RiskManager, AutoTrader, PaperBroker
+│   │   ├── backtest/             # bar-by-bar Backtester
+│   │   ├── indicators/           # TechnicalIndicators, SupportResistance
+│   │   ├── reporting/            # chart + markdown output
+│   │   ├── data_fetcher.py
+│   │   ├── scanner.py
+│   │   └── system.py             # PredictionTradingSystem (primary facade)
+│   └── tests/                    # 78 tests, no network or API key required
+├── frontend/
+│   ├── app.py                    # Streamlit entry point
+│   └── ui/                       # pages, components, theme, watchlist
+├── config/
+│   ├── default.yaml
+│   └── risk_profiles.yaml
+├── docs/                         # guides, API reference, examples
+├── examples/                     # annotated usage scripts
+└── results/                      # run outputs (gitignored)
 ```
 
 ---
@@ -61,7 +104,8 @@ python stock_predictor.py --tickers AAPL --no-ai
 ## Web UI
 
 ```bash
-streamlit run app.py    # opens http://localhost:8501
+make ui-dev    # or: uv run streamlit run frontend/app.py
+# opens http://localhost:8501
 ```
 
 Seven pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Alerts** · **Settings**
@@ -70,27 +114,47 @@ Navigation uses a top bar with a light/dark theme toggle. A persistent watchlist
 
 ---
 
+## REST API
+
+```bash
+make api-dev   # or: uv run uvicorn prediction_trading.api.main:app --reload --port 8000
+# OpenAPI docs at http://localhost:8000/docs
+```
+
+Endpoints mirror the Python API:
+
+| Method | Path | Action |
+|--------|------|--------|
+| `POST` | `/predict` | Run prediction for one ticker |
+| `POST` | `/scan` | Scan a watchlist of tickers |
+| `POST` | `/backtest` | Run a backtest over a date range |
+| `POST` | `/trading/cycle` | Execute one AutoTrader cycle |
+
+See `docs/API_REFERENCE.md` or `/docs` for full schema details.
+
+---
+
 ## CLI Usage
 
-### `stock_predictor.py`
+### `stock-predictor`
 
-The primary prediction CLI. Mirrors the `stock-prediction` interface exactly.
+The primary prediction CLI.
 
 ```bash
 # Rule-based only (no API key needed)
-python stock_predictor.py --tickers AAPL --no-ai
+uv run stock-predictor --tickers AAPL --no-ai
 
 # AI-fused prediction with Claude
-python stock_predictor.py --tickers AAPL TSLA --timeframe 1m
+uv run stock-predictor --tickers AAPL TSLA --timeframe 1m
 
 # Select specific indicator categories
-python stock_predictor.py --tickers NVDA --indicators trend momentum
+uv run stock-predictor --tickers NVDA --indicators trend momentum
 
 # Enable 4H confluence bonus
-python stock_predictor.py --tickers AAPL --4h
+uv run stock-predictor --tickers AAPL --4h
 
 # Use a specific Claude model
-python stock_predictor.py --tickers AAPL --model claude-opus-4-7
+uv run stock-predictor --tickers AAPL --model claude-opus-4-7
 ```
 
 **Full options:**
@@ -126,39 +190,39 @@ python stock_predictor.py --tickers AAPL --model claude-opus-4-7
 
 ---
 
-### `automated_trader.py`
+### `automated-trader`
 
 Paper-trades on a live schedule using the same prediction and risk engine.
 
 ```bash
 # Single dry-run cycle (signals only, no orders)
-python automated_trader.py --tickers AAPL TSLA --dry-run --once
+uv run automated-trader --tickers AAPL TSLA --dry-run --once
 
 # Paper-trade every 5 minutes, persist portfolio state
-python automated_trader.py --tickers AAPL MSFT NVDA --interval 300
+uv run automated-trader --tickers AAPL MSFT NVDA --interval 300
 
 # AI-fused, market-hours only, 12 cycles
-ANTHROPIC_API_KEY=sk-ant-... python automated_trader.py \
+ANTHROPIC_API_KEY=sk-ant-... uv run automated-trader \
     --tickers AAPL --ai --market-hours --cycles 12 --interval 300
 ```
 
 ---
 
-### `scan_watchlist.py`
+### `scan-watchlist`
 
 Screens tickers in parallel with the rule-based engine. No API key required.
 
 ```bash
-python scan_watchlist.py --tickers AAPL TSLA NVDA MSFT GOOG
+uv run scan-watchlist --tickers AAPL TSLA NVDA MSFT GOOG
 
 # Filter by minimum confidence
-python scan_watchlist.py --tickers AAPL TSLA NVDA --min-confidence 0.4
+uv run scan-watchlist --tickers AAPL TSLA NVDA --min-confidence 0.4
 
 # Restrict indicator categories
-python scan_watchlist.py --tickers AAPL TSLA --indicators trend momentum
+uv run scan-watchlist --tickers AAPL TSLA --indicators trend momentum
 
 # Increase parallelism
-python scan_watchlist.py $(cat my_watchlist.txt) --workers 8
+uv run scan-watchlist $(cat my_watchlist.txt) --workers 8
 ```
 
 Output is a colour-coded terminal table sorted by confidence descending, showing direction, confidence %, current price, and top 3 scored factors.
@@ -237,7 +301,7 @@ Confidence is deterministic: `min(1.0, abs(net_points) / 10)`. See [`DESIGN.md`]
 ## Backtester
 
 ```python
-from src import PredictionTradingSystem
+from prediction_trading.system import PredictionTradingSystem
 
 system = PredictionTradingSystem(ticker="AAPL", initial_capital=10_000, enable_ai=True)
 result = system.backtest("2023-01-01", "2024-01-01")
@@ -270,7 +334,7 @@ Each cycle per ticker:
 ### Python API
 
 ```python
-from src import PredictionTradingSystem
+from prediction_trading.system import PredictionTradingSystem
 
 system = PredictionTradingSystem(ticker="AAPL", initial_capital=25_000, enable_ai=True)
 trader = system.build_auto_trader(
@@ -308,7 +372,7 @@ results/live_20260422_081000/
 ## Watchlist Scanner
 
 ```python
-from src.scanner import WatchlistScanner
+from prediction_trading.scanner import WatchlistScanner
 
 results = WatchlistScanner(min_confidence=0.4, workers=8).scan(["AAPL", "TSLA", "NVDA"])
 for r in results:
@@ -336,10 +400,11 @@ trader:
 ## Testing
 
 ```bash
-pytest tests/ -v     # 78 tests across 11 files
+make test          # uv run pytest backend/tests/ -v
+make test-cov      # with coverage report
 ```
 
-All tests use synthetic OHLCV fixtures (`tests/conftest.py`) — no network or API key required.
+All 78 tests across 11 files use synthetic OHLCV fixtures (`backend/tests/conftest.py`) — no network or API key required.
 
 ---
 
@@ -348,7 +413,7 @@ All tests use synthetic OHLCV fixtures (`tests/conftest.py`) — no network or A
 | Document | Contents |
 |----------|----------|
 | [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough |
-| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Python API reference |
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Python and REST API reference |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture deep-dive |
 | [`docs/EXAMPLES.md`](docs/EXAMPLES.md) | Annotated code examples |
 | [`docs/QUICK_REFERENCE.md`](docs/QUICK_REFERENCE.md) | CLI/API cheat-sheet |
