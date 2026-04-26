@@ -16,6 +16,7 @@ same four methods: ``get_quote``, ``place_order``, ``close_position``,
 """
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -234,3 +235,113 @@ class RecordingBroker(BaseBroker):
     ) -> Trade | None:
         self.closes.append((ticker, reason))
         return None
+
+
+# =========================================================================
+# Alpaca broker (live and paper trading via Alpaca API)
+# =========================================================================
+try:
+    from alpaca.trading.client import TradingClient as _AlpacaTradingClient
+    from alpaca.trading.requests import (
+        MarketOrderRequest as _MarketOrderReq,
+        LimitOrderRequest as _LimitOrderReq,
+    )
+    from alpaca.trading.enums import OrderSide as _OrderSide, TimeInForce as _TIF
+    from alpaca.data.historical import StockHistoricalDataClient as _AlpacaDataClient
+    from alpaca.data.requests import (
+        StockLatestQuoteRequest as _LatestQuoteReq,
+        StockLatestBarRequest as _LatestBarReq,
+    )
+    _ALPACA_TRADING_AVAILABLE = True
+except ImportError:
+    _AlpacaTradingClient = None   # type: ignore[assignment,misc]
+    _MarketOrderReq = None        # type: ignore[assignment]
+    _LimitOrderReq = None         # type: ignore[assignment]
+    _OrderSide = None             # type: ignore[assignment]
+    _TIF = None                   # type: ignore[assignment]
+    _AlpacaDataClient = None      # type: ignore[assignment,misc]
+    _LatestQuoteReq = None        # type: ignore[assignment]
+    _LatestBarReq = None          # type: ignore[assignment]
+    _ALPACA_TRADING_AVAILABLE = False
+
+
+class AlpacaBroker(BaseBroker):
+    """Live or paper broker backed by the Alpaca Orders API.
+
+    Position state lives in Alpaca; no local Portfolio is maintained.
+    Requires ``ALPACA_API_KEY`` and ``ALPACA_API_SECRET`` env vars.
+    Set ``paper_trading=True`` (default) to use paper-api.alpaca.markets.
+    """
+
+    def __init__(self, *, paper_trading: bool = True) -> None:
+        if not _ALPACA_TRADING_AVAILABLE:
+            raise ImportError(
+                "alpaca-py is not installed. "
+                "Run `pip install alpaca-py` or `uv pip install alpaca-py`."
+            )
+        key = os.environ["ALPACA_API_KEY"]
+        secret = os.environ["ALPACA_API_SECRET"]
+        self._client = _AlpacaTradingClient(key, secret, paper=paper_trading)
+        self._data_client = _AlpacaDataClient(key, secret)
+
+    def get_quote(self, ticker: str) -> float:
+        try:
+            req = _LatestQuoteReq(symbol_or_symbols=ticker.upper())
+            quotes = self._data_client.get_stock_latest_quote(req)
+            q = quotes[ticker.upper()]
+            price = float(q.ask_price) if q.ask_price else float(q.bid_price)
+            return price
+        except Exception:
+            req2 = _LatestBarReq(symbol_or_symbols=ticker.upper())
+            bars = self._data_client.get_stock_latest_bar(req2)
+            return float(bars[ticker.upper()].close)
+
+    def place_order(self, order: Order) -> Fill | None:
+        if order.quantity <= 0:
+            return None
+        side = _OrderSide.BUY if order.side == "long" else _OrderSide.SELL
+        now = datetime.now(timezone.utc)
+        try:
+            if order.order_type == "limit" and order.limit_price is not None:
+                req = _LimitOrderReq(
+                    symbol=order.ticker.upper(),
+                    qty=order.quantity,
+                    side=side,
+                    time_in_force=_TIF.DAY,
+                    limit_price=order.limit_price,
+                )
+            else:
+                req = _MarketOrderReq(
+                    symbol=order.ticker.upper(),
+                    qty=order.quantity,
+                    side=side,
+                    time_in_force=_TIF.DAY,
+                )
+            response = self._client.submit_order(req)
+            fill_price = float(response.filled_avg_price or order.limit_price or 0.0)
+            return Fill(
+                order=order,
+                fill_price=fill_price,
+                filled_at=now,
+                commission=0.0,
+                broker_order_id=str(response.id),
+            )
+        except Exception:
+            return None
+
+    def close_position(
+        self,
+        ticker: str,
+        *,
+        reason: str = "manual",
+        quote: float | None = None,
+        when: datetime | None = None,
+    ) -> Trade | None:
+        try:
+            self._client.close_position(ticker.upper())
+        except Exception:
+            pass
+        return None  # state lives in Alpaca; no local Trade to return
+
+    def sync(self) -> None:
+        pass  # future: reconcile from self._client.get_all_positions()
