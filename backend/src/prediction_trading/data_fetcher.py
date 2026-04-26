@@ -56,6 +56,33 @@ class NewsContext:
 
 
 @dataclass
+class IndexSnapshot:
+    """Price snapshot for a single market index."""
+
+    symbol: str
+    name: str
+    price: float | None
+    change_1d_pct: float | None
+    change_5d_pct: float | None
+    change_30d_pct: float | None
+    above_sma50: bool | None
+    above_sma200: bool | None
+    ohlcv_30d: pd.DataFrame | None = field(default=None, repr=False, compare=False)
+
+    def as_dict(self) -> dict:
+        return {
+            "symbol": self.symbol,
+            "name": self.name,
+            "price": self.price,
+            "change_1d_pct": self.change_1d_pct,
+            "change_5d_pct": self.change_5d_pct,
+            "change_30d_pct": self.change_30d_pct,
+            "above_sma50": self.above_sma50,
+            "above_sma200": self.above_sma200,
+        }
+
+
+@dataclass
 class MacroContext:
     """Macro economic snapshot fetched from yfinance index symbols."""
 
@@ -64,6 +91,7 @@ class MacroContext:
     yield_2y: float | None
     yield_spread: float | None       # 10Y - 2Y
     spy_above_sma50: bool | None
+    indexes: list[IndexSnapshot] = field(default_factory=list)
 
 
 @dataclass
@@ -224,8 +252,55 @@ class DataFetcher:
             earnings_upcoming_days=earnings_upcoming_days,
         )
 
+    @staticmethod
+    def _fetch_index_snapshot(sym: str, name: str) -> IndexSnapshot:
+        """Fetch price, change %, and trend for a single market index symbol."""
+        try:
+            df = yf.download(sym, period="3mo", progress=False, auto_adjust=True)
+            if df is None or df.empty:
+                return IndexSnapshot(symbol=sym, name=name, price=None,
+                                     change_1d_pct=None, change_5d_pct=None,
+                                     change_30d_pct=None, above_sma50=None,
+                                     above_sma200=None)
+            close = df["Close"]
+            if isinstance(close, pd.DataFrame):
+                close = close.iloc[:, 0]
+            close = close.dropna()
+            if close.empty:
+                return IndexSnapshot(symbol=sym, name=name, price=None,
+                                     change_1d_pct=None, change_5d_pct=None,
+                                     change_30d_pct=None, above_sma50=None,
+                                     above_sma200=None)
+
+            price = float(close.iloc[-1])
+
+            def _pct(n: int) -> float | None:
+                if len(close) > n:
+                    return float((close.iloc[-1] / close.iloc[-1 - n] - 1) * 100)
+                return None
+
+            change_1d = _pct(1)
+            change_5d = _pct(5)
+            change_30d = _pct(30)
+
+            sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else None
+            sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else None
+
+            return IndexSnapshot(
+                symbol=sym, name=name, price=price,
+                change_1d_pct=change_1d, change_5d_pct=change_5d, change_30d_pct=change_30d,
+                above_sma50=price > sma50 if sma50 is not None else None,
+                above_sma200=price > sma200 if sma200 is not None else None,
+                ohlcv_30d=df.tail(30),
+            )
+        except Exception:
+            return IndexSnapshot(symbol=sym, name=name, price=None,
+                                 change_1d_pct=None, change_5d_pct=None,
+                                 change_30d_pct=None, above_sma50=None,
+                                 above_sma200=None)
+
     def fetch_macro_context(self) -> MacroContext:
-        """VIX, yield curve, and SPY trend from yfinance index symbols."""
+        """VIX, yield curve, SPY trend, and major index snapshots from yfinance."""
 
         def _last_close(sym: str, period: str = "5d") -> float | None:
             try:
@@ -259,12 +334,16 @@ class DataFetcher:
         except Exception:
             pass
 
+        _INDEX_MAP = [("^DJI", "DOW"), ("^IXIC", "NASDAQ"), ("^GSPC", "S&P 500")]
+        indexes = [self._fetch_index_snapshot(sym, name) for sym, name in _INDEX_MAP]
+
         return MacroContext(
             vix=vix,
             yield_10y=y10,
             yield_2y=y2,
             yield_spread=spread,
             spy_above_sma50=spy_above_sma50,
+            indexes=indexes,
         )
 
     def fetch_sector_context(self, ticker: str, stock_ohlcv: pd.DataFrame) -> SectorContext:
