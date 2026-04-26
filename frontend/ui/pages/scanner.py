@@ -102,34 +102,42 @@ def _show_results(results: list) -> None:
         )
 
     st.markdown(f"#### Results ({len(results)} tickers)")
+
+    _SIG_COLOR = {"BUY": "#00d25b", "SELL": "#ff4b4b", "HOLD": "#8b949e"}
+    header = st.columns([1, 1, 1, 1, 3, 2])
+    for col, label in zip(header, ["**Ticker**", "**Signal**", "**Confidence**", "**Price**", "**Top Factors**", "**Error**"]):
+        col.markdown(label)
+    st.divider()
+
     rows = []
     for r in results:
         direction = getattr(r, "direction", "neutral")
         confidence = getattr(r, "confidence", 0.0)
-        price = getattr(r, "current_price", None)
+        price = getattr(r, "current_price", 0.0)
         top_factors = getattr(r, "top_factors", [])
         error = getattr(r, "error", None)
+        ticker = getattr(r, "ticker", "")
+        signal = _LABELS.get(direction, "HOLD")
+        color = _SIG_COLOR.get(signal, "#8b949e")
+
+        c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1, 3, 2])
+        c1.markdown(f"**{ticker}**")
+        c2.markdown(f'<span style="color:{color};font-weight:600">{signal}</span>', unsafe_allow_html=True)
+        c3.markdown(f"{confidence:.0%}")
+        c4.markdown(f"${price:.2f}" if price else "—")
+        c5.markdown(", ".join(top_factors[:3]) if top_factors else "—")
+        c6.markdown(f'<span style="color:#ff4b4b;font-size:0.8em">{error}</span>' if error else "✓", unsafe_allow_html=True)
+
         rows.append({
-            "Ticker": getattr(r, "ticker", ""),
-            "Signal": _LABELS.get(direction, "HOLD"),
-            "Confidence": confidence,
+            "Ticker": ticker,
+            "Signal": signal,
+            "Confidence": f"{confidence:.1%}",
             "Price": f"${price:.2f}" if price else "—",
             "Top Factors": ", ".join(top_factors[:3]) if top_factors else "—",
             "Error": error or "",
         })
 
     df = pd.DataFrame(rows)
-
-    def _style_signal(val: str):
-        colors = {"BUY": "#00d25b", "SELL": "#ff4b4b", "HOLD": "#8b949e"}
-        c = colors.get(val, "#8b949e")
-        bg = {"BUY": "rgba(0,210,91,0.15)", "SELL": "rgba(255,75,75,0.15)"}.get(val, "transparent")
-        return f"color: {c}; background-color: {bg}; font-weight: 600;"
-
-    styled = df.style.applymap(_style_signal, subset=["Signal"])  # type: ignore[arg-type]
-    styled = styled.format({"Confidence": "{:.1%}"})
-    st.dataframe(styled, use_container_width=True, hide_index=True)
-
     csv_buf = io.StringIO()
     df.to_csv(csv_buf, index=False)
     st.download_button(
