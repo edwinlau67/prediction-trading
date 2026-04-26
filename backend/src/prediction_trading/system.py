@@ -167,6 +167,9 @@ class PredictionTradingSystem:
             weekly=weekly_df,
             hourly_4h=hourly_4h,
             fundamentals=mkt.fundamentals,
+            news_context=mkt.news_context,
+            macro_context=mkt.macro_context,
+            sector_context=mkt.sector_context,
         )
 
     # -------------------------------------------------------------- backtest

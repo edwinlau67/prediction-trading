@@ -15,6 +15,9 @@ from .ai_predictor import AIPredictor, AIPrediction
 from .factor import Direction, Factor
 from .signal_scorer import ScoredSignal, SignalScorer
 
+if False:  # TYPE_CHECKING
+    from ..data_fetcher import MacroContext, NewsContext, SectorContext
+
 
 @dataclass
 class Prediction:
@@ -29,6 +32,7 @@ class Prediction:
     ai_signal: AIPrediction | None = None
     factors: list[Factor] = field(default_factory=list)
     meta: dict[str, Any] = field(default_factory=dict)
+    timing: "Any | None" = field(default=None, repr=False)
 
     @property
     def bullish_factors(self) -> list[Factor]:
@@ -51,6 +55,7 @@ class Prediction:
             "ai_signal": self.ai_signal.as_dict() if self.ai_signal else None,
             "factors": [f.as_dict() for f in self.factors],
             "meta": self.meta,
+            "timing": self.timing.as_dict() if self.timing is not None else None,
         }
 
 
@@ -83,8 +88,16 @@ class UnifiedPredictor:
         weekly: pd.DataFrame | None = None,
         hourly_4h: pd.DataFrame | None = None,
         fundamentals: dict | None = None,
+        news_context: "NewsContext | None" = None,
+        macro_context: "MacroContext | None" = None,
+        sector_context: "SectorContext | None" = None,
     ) -> Prediction:
-        rule = self.scorer.score(df, weekly=weekly, hourly_4h=hourly_4h, fundamentals=fundamentals)
+        rule = self.scorer.score(
+            df, weekly=weekly, hourly_4h=hourly_4h, fundamentals=fundamentals,
+            news_context=news_context,
+            macro_context=macro_context,
+            sector_context=sector_context,
+        )
         ai_pred: AIPrediction | None = None
         factors: list[Factor] = list(rule.factors)
 
@@ -104,7 +117,7 @@ class UnifiedPredictor:
 
         direction, confidence = self._fuse(rule, ai_pred)
 
-        return Prediction(
+        prediction = Prediction(
             ticker=ticker,
             direction=direction,
             confidence=confidence,
@@ -123,6 +136,14 @@ class UnifiedPredictor:
                                  (ai_pred.fundamentals if ai_pred else {}) or {}),
             },
         )
+
+        try:
+            from .timing import compute_timing
+            prediction.timing = compute_timing(rule, df, prediction)
+        except Exception:
+            pass
+
+        return prediction
 
     # ------------------------------------------------------------------ fuse
     def _fuse(self, rule: ScoredSignal, ai: AIPrediction | None

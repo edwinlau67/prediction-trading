@@ -502,6 +502,23 @@ class SignalScorer:
         elif ctx.spy_above_sma50 is False:
             facs.append(Factor("macro", "Broad market downtrend", "bearish", 1,
                                "SPY below 50-day SMA"))
+
+        if ctx.indexes:
+            above_50 = sum(1 for idx in ctx.indexes if idx.above_sma50 is True)
+            above_200 = sum(1 for idx in ctx.indexes if idx.above_sma200 is True)
+            if above_50 >= 2:
+                facs.append(Factor("macro", "Market breadth above SMA50", "bullish", 1,
+                                   f"{above_50}/3 indexes above 50d SMA"))
+            elif above_50 == 0:
+                facs.append(Factor("macro", "Market breadth below SMA50", "bearish", 1,
+                                   "All 3 indexes below 50d SMA"))
+            if above_200 == 3:
+                facs.append(Factor("macro", "Full market above SMA200", "bullish", 1,
+                                   "DOW, NASDAQ & S&P 500 all above 200d SMA"))
+            elif above_200 == 0:
+                facs.append(Factor("macro", "Full market below SMA200", "bearish", 1,
+                                   "All 3 indexes below 200d SMA"))
+
         return facs
 
     # ----------------------------------------------------------- sector rules
