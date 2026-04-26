@@ -153,6 +153,25 @@ class PredictionReportWriter(BaseReportWriter):
         ))
         out.append("")
 
+        # ⏱ Timing Recommendation
+        if p.timing is not None:
+            out.append(self.md_heading(3, "⏱ Timing Recommendation"))
+            out.append("")
+            out.append(f"**Action:** `{p.timing.action}`")
+            out.append("")
+            out.append(f"**Rationale:** {p.timing.reason}")
+            out.append("")
+            timing_rows: list[list[str]] = []
+            if p.timing.entry_price is not None:
+                timing_rows.append(["Entry Price", f"${p.timing.entry_price:,.2f}"])
+            if p.timing.stop_loss is not None:
+                timing_rows.append(["Stop Loss", f"${p.timing.stop_loss:,.2f}"])
+            if p.timing.take_profit is not None:
+                timing_rows.append(["Take Profit", f"${p.timing.take_profit:,.2f}"])
+            timing_rows.append(["Time Horizon", p.timing.time_horizon])
+            out.extend(self.md_table(["Field", "Value"], timing_rows))
+            out.append("")
+
         # 📝 Analysis
         out.append(self.md_heading(3, "📝 Analysis"))
         out.append("")

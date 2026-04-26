@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..data_fetcher import MacroContext
 from ..indicators import SupportResistance, TechnicalIndicators
 from ..prediction.factor import ALL_CATEGORIES, Factor
 from ..prediction.predictor import Prediction
@@ -50,12 +51,13 @@ class PredictionChart(BaseChart):
         categories: Iterable[str] | None = None,
         timeframe: str = "1w",
         out_path: str | Path,
+        macro_context: MacroContext | None = None,
     ) -> Path:
         categories = tuple(c for c in (categories or ALL_CATEGORIES)
                            if c in ALL_CATEGORIES)
         df = TechnicalIndicators.compute_all(ohlcv)
 
-        panels = self._panel_spec(categories, prediction)
+        panels = self._panel_spec(categories, prediction, macro_context=macro_context)
         fig_height = 3 * len(panels) + 2
         fig = plt.figure(figsize=(14, fig_height))
         gs = fig.add_gridspec(len(panels), 1, hspace=0.45)
@@ -73,7 +75,8 @@ class PredictionChart(BaseChart):
         return self._save(fig, out_path, bbox_inches="tight")
 
     # ------------------------------------------------------------ panel set
-    def _panel_spec(self, cats: tuple[str, ...], p: Prediction) -> list:
+    def _panel_spec(self, cats: tuple[str, ...], p: Prediction,
+                    *, macro_context: MacroContext | None = None) -> list:
         panels: list = [self._panel_price_target]
 
         # always-on: confidence/risk + signal factors
@@ -101,6 +104,16 @@ class PredictionChart(BaseChart):
             )
             if has_fund:
                 panels.append(self._panel_fundamentals)
+
+        if macro_context is not None and any(
+            idx.ohlcv_30d is not None for idx in macro_context.indexes
+        ):
+            _mc = macro_context
+            panels.append(
+                lambda ax, p, df, cats, tf, mc=_mc:
+                    self._panel_market_indexes(ax, p, df, cats, tf, mc)
+            )
+
         return panels
 
     # =============================================================== panels
@@ -397,3 +410,39 @@ class PredictionChart(BaseChart):
         if amber and amber(v):
             return (COLOR_WARN, text)
         return ("#c0c0c0", text)
+
+    # ------------------------------------------------ market indexes panel
+    def _panel_market_indexes(self, ax, p: Prediction, df, cats, tf,
+                               macro_ctx: MacroContext) -> None:
+        """30-day normalised performance: stock vs DOW, NASDAQ, S&P 500."""
+        _COLORS = ["#ff7f0e", "#9467bd", "#2ca02c"]
+
+        stock_close = df["Close"].tail(30)
+        if stock_close.empty:
+            return
+        base = float(stock_close.iloc[0])
+        if base == 0:
+            return
+        ax.plot(range(len(stock_close)), stock_close / base * 100,
+                label=p.ticker, color=COLOR_PRICE, linewidth=2.0)
+
+        for idx_snap, color in zip(macro_ctx.indexes, _COLORS):
+            if idx_snap.ohlcv_30d is None or idx_snap.ohlcv_30d.empty:
+                continue
+            idx_close = idx_snap.ohlcv_30d["Close"]
+            if isinstance(idx_close, pd.DataFrame):
+                idx_close = idx_close.iloc[:, 0]
+            idx_close = idx_close.dropna().tail(30)
+            if idx_close.empty:
+                continue
+            idx_base = float(idx_close.iloc[0])
+            if idx_base == 0:
+                continue
+            ax.plot(range(len(idx_close)), idx_close / idx_base * 100,
+                    label=idx_snap.name, color=color, linewidth=1.3, alpha=0.85)
+
+        ax.axhline(100, color="black", linewidth=0.5, linestyle="--", alpha=0.5)
+        ax.set_title("30-Day Relative Performance (indexed to 100)", fontweight="bold")
+        ax.legend(loc="upper left", fontsize=8)
+        ax.set_ylabel("Index (100 = start)")
+        ax.grid(True, alpha=0.3)
