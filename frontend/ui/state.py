@@ -18,6 +18,7 @@ PREDICT_TICKER = "predict_ticker"
 BT_RESULT = "bt_result"
 BT_TICKER = "bt_ticker"
 BT_OHLCV = "bt_ohlcv"
+BT_TRADES = "bt_trades"
 
 # Scanner page
 SCAN_RESULTS = "scan_results"
@@ -52,6 +53,7 @@ _DEFAULTS: dict = {
     BT_RESULT: None,
     BT_TICKER: "",
     BT_OHLCV: None,
+    BT_TRADES: None,
     SCAN_RESULTS: None,
     TRADER_RUNNING: False,
     TRADER_INSTANCE: None,

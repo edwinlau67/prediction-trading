@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pandas as pd
 import streamlit as st
 
-from ui.components import candlestick_chart, equity_chart, metric_card, trade_log_table
-from ui.state import BT_OHLCV, BT_RESULT, BT_TICKER
+from ui.components import candlestick_chart, equity_chart, metric_card
+from ui.state import BT_OHLCV, BT_RESULT, BT_TICKER, BT_TRADES
 
 
 def render() -> None:
@@ -57,6 +58,27 @@ def _run_backtest(ticker, start, end, capital, commission) -> None:
         st.session_state[BT_RESULT] = result
         st.session_state[BT_TICKER] = ticker
         st.session_state[BT_OHLCV] = system._market.ohlcv if system._market else None
+        trades_data = []
+        for t in result.portfolio.closed_trades:
+            try:
+                ep = t.entry_price or 0.0
+                xp = t.exit_price or 0.0
+                sign = 1 if str(t.side) == "long" else -1
+                ret = sign * (xp - ep) / ep * 100 if ep != 0 else 0.0
+                trades_data.append({
+                    "Ticker": t.ticker,
+                    "Side": str(t.side or "").upper(),
+                    "Qty": t.quantity,
+                    "Entry": f"${ep:.2f}",
+                    "Exit": f"${xp:.2f}",
+                    "P&L": f"${t.pnl:+.2f}",
+                    "Return %": f"{ret:+.2f}%",
+                    "Result": "Win" if t.pnl > 0 else "Loss",
+                    "Reason": str(t.reason or ""),
+                })
+            except Exception:
+                pass
+        st.session_state[BT_TRADES] = trades_data
 
     except Exception as exc:
         st.error(f"Backtest failed: {exc}")
@@ -131,8 +153,29 @@ def _show_results(result, initial_capital: float = 10_000.0) -> None:
             st.info("OHLCV data not available.")
 
     with tab_log:
-        if portfolio:
-            trade_log_table(portfolio.closed_trades)
+        trades_rows = st.session_state.get(BT_TRADES)
+        if not trades_rows and portfolio:
+            trades_rows = [
+                {
+                    "Ticker": t.ticker,
+                    "Side": str(t.side or "").upper(),
+                    "Qty": t.quantity,
+                    "Entry": f"${t.entry_price:.2f}",
+                    "Exit": f"${t.exit_price:.2f}",
+                    "P&L": f"${t.pnl:+.2f}",
+                    "Result": "Win" if t.pnl > 0 else "Loss",
+                    "Reason": str(t.reason or ""),
+                }
+                for t in getattr(portfolio, "closed_trades", [])
+            ]
+        if trades_rows:
+            html = pd.DataFrame(trades_rows).to_html(index=False, border=0, escape=False)
+            st.markdown(
+                f'<div style="overflow-x:auto;max-height:500px;overflow-y:auto">{html}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("No trades recorded.")
 
     # Save report
     ticker_key = st.session_state.get(BT_TICKER, "")

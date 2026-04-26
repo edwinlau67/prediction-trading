@@ -164,6 +164,17 @@ header[data-testid="stHeader"] { background: transparent !important; }
 }
 .dvn-scroller { background: #1c2128 !important; }
 
+/* ── Inline HTML tables (trade log) ─────────────────────────────── */
+table.dataframe { width:100%; border-collapse:collapse; font-size:0.84rem; }
+table.dataframe thead tr th {
+    padding:6px 10px; text-align:left !important;
+    border-bottom:2px solid #3d444d;
+    color:#b0b8c4; font-size:0.74rem;
+    text-transform:uppercase; letter-spacing:0.5px; font-weight:600;
+}
+table.dataframe tbody tr td { padding:5px 10px; border-bottom:1px solid #2d333b; color:#e8edf3; }
+table.dataframe tbody tr:hover td { background:#1c2128; }
+
 /* ── Expanders ──────────────────────────────────────────────────── */
 [data-testid="stExpander"] {
     background: #1c2128 !important;
@@ -380,6 +391,17 @@ header[data-testid="stHeader"] { background: transparent !important; }
     overflow: hidden;
 }
 .dvn-scroller { background: #ffffff !important; }
+
+/* ── Inline HTML tables (trade log) ─────────────────────────────── */
+table.dataframe { width:100%; border-collapse:collapse; font-size:0.84rem; }
+table.dataframe thead tr th {
+    padding:6px 10px; text-align:left !important;
+    border-bottom:2px solid #d0d7de;
+    color:#57606a; font-size:0.74rem;
+    text-transform:uppercase; letter-spacing:0.5px; font-weight:600;
+}
+table.dataframe tbody tr td { padding:5px 10px; border-bottom:1px solid #eaecef; color:#24292f; }
+table.dataframe tbody tr:hover td { background:#f6f8fa; }
 
 /* ── Expanders ──────────────────────────────────────────────────── */
 [data-testid="stExpander"] {
