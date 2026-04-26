@@ -37,6 +37,8 @@ def render() -> None:
     indicators = cfg.get("indicators", {})
     ai = cfg.get("ai", {})
     trader = cfg.get("trader", {})
+    data_cfg = cfg.get("data", {})
+    broker_cfg = cfg.get("broker", {"type": "paper", "paper_trading": True})
 
     # ── Risk Profile ──────────────────────────────────────────────────────────
     st.subheader("Risk Profile")
@@ -179,6 +181,44 @@ def render() -> None:
             value=float(trader.get("slippage_bps", 0.0)),
         )
 
+    # ── Data Source ───────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Data Source")
+    _sources = ["yfinance", "alpaca", "both"]
+    _src_idx = _sources.index(data_cfg.get("source", "yfinance")) if data_cfg.get("source", "yfinance") in _sources else 0
+    data_cfg["source"] = st.selectbox(
+        "OHLCV Data Source",
+        _sources,
+        index=_src_idx,
+        help="'alpaca' uses Alpaca Markets API; 'both' prefers Alpaca with yfinance fallback.",
+    )
+    if data_cfg["source"] in ("alpaca", "both"):
+        st.info(
+            "Alpaca requires **ALPACA_API_KEY** and **ALPACA_API_SECRET** "
+            "environment variables and `alpaca-py` installed. "
+            "Install: `pip install alpaca-py`"
+        )
+
+    # ── Broker Configuration ──────────────────────────────────────────────────
+    st.subheader("Broker Configuration")
+    col_b1, col_b2 = st.columns(2)
+    with col_b1:
+        _broker_types = ["paper", "alpaca"]
+        _broker_idx = _broker_types.index(broker_cfg.get("type", "paper")) if broker_cfg.get("type", "paper") in _broker_types else 0
+        broker_cfg["type"] = st.selectbox(
+            "Broker",
+            _broker_types,
+            index=_broker_idx,
+            help="'paper' simulates fills locally; 'alpaca' submits live/paper orders to Alpaca.",
+        )
+    with col_b2:
+        broker_cfg["paper_trading"] = st.toggle(
+            "Alpaca Paper Trading Mode",
+            value=bool(broker_cfg.get("paper_trading", True)),
+            disabled=(broker_cfg["type"] != "alpaca"),
+            help="When enabled, uses paper-api.alpaca.markets instead of live trading.",
+        )
+
     st.divider()
     if st.button("Save Settings", type="primary"):
         cfg["portfolio"] = portfolio
@@ -187,6 +227,8 @@ def render() -> None:
         cfg["indicators"] = indicators
         cfg["ai"] = ai
         cfg["trader"] = trader
+        cfg["data"] = data_cfg
+        cfg["broker"] = broker_cfg
         _save(_DEFAULT_CFG, cfg)
         st.session_state[SETTINGS_DIRTY] = False
         st.success("Settings saved to `config/default.yaml`. Restart the app to apply to running systems.")

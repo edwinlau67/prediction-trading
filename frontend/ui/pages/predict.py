@@ -8,7 +8,7 @@ import streamlit as st
 
 from ui.components import candlestick_chart, prediction_card
 from ui.state import (
-    PREDICT_CHART_PATH, PREDICT_MACRO_CONTEXT, PREDICT_OHLCV,
+    PREDICT_CHART_PATH, PREDICT_DATA_FEED, PREDICT_MACRO_CONTEXT, PREDICT_OHLCV,
     PREDICT_RESULT, PREDICT_TICKER,
 )
 
@@ -60,6 +60,9 @@ def render() -> None:
 
     if prediction is not None and cached_ticker == ticker:
         st.divider()
+        data_feed = st.session_state.get(PREDICT_DATA_FEED, "")
+        if data_feed:
+            st.caption(f"Data source: **{data_feed}**")
 
         tab_signal, tab_chart, tab_static = st.tabs(
             ["📊 Signal", "🕯️ Candlestick Chart", "📈 Analysis Chart"]
@@ -172,6 +175,7 @@ def _run_prediction(
         st.session_state[PREDICT_CHART_PATH] = rendered
         st.session_state[PREDICT_TICKER] = ticker
         st.session_state[PREDICT_MACRO_CONTEXT] = market.macro_context
+        st.session_state[PREDICT_DATA_FEED] = getattr(market, "data_feed", "yfinance")
 
         if save_report:
             system._market = market
