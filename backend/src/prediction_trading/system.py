@@ -21,7 +21,7 @@ except Exception:
     pass
 
 from .backtest import Backtester, BacktestResult
-from .data_fetcher import DataFetcher, MarketData
+from .data_fetcher import DataFetcher, MarketData, create_data_fetcher
 from .indicators import TechnicalIndicators
 from .logger import get_logger
 from .prediction import AIPredictor, Prediction, SignalScorer, UnifiedPredictor
@@ -49,6 +49,7 @@ class _Config:
     ai: dict[str, Any]
     data: dict[str, Any]
     trader: dict[str, Any]
+    broker: dict[str, Any]
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> "_Config":
@@ -62,7 +63,22 @@ class _Config:
             ai=data.get("ai", {}),
             data=data.get("data", {}),
             trader=data.get("trader", {}),
+            broker=data.get("broker", {}),
         )
+
+
+def _build_broker(
+    broker_cfg: dict[str, Any],
+    portfolio: "Portfolio",
+    slippage_bps: float = 0.0,
+) -> "BaseBroker":
+    broker_type = broker_cfg.get("type", "paper")
+    if broker_type == "paper":
+        return PaperBroker(portfolio, slippage_bps=slippage_bps)
+    if broker_type == "alpaca":
+        from .trading.broker import AlpacaBroker
+        return AlpacaBroker(paper_trading=bool(broker_cfg.get("paper_trading", True)))
+    raise ValueError(f"Unknown broker type: {broker_type!r}")
 
 
 class PredictionTradingSystem:
@@ -87,7 +103,10 @@ class PredictionTradingSystem:
         if enable_ai is not None:
             self.cfg.ai["enabled"] = enable_ai
 
-        self.data_fetcher = DataFetcher(interval=self.cfg.data.get("interval", "1d"))
+        self.data_fetcher = create_data_fetcher(
+            source=self.cfg.data.get("source", "yfinance"),
+            interval=self.cfg.data.get("interval", "1d"),
+        )
 
         categories = tuple(self.cfg.indicators.get("categories") or ())
         self.scorer = SignalScorer(
@@ -250,7 +269,8 @@ class PredictionTradingSystem:
             )
 
         if broker is None:
-            broker = PaperBroker(
+            broker = _build_broker(
+                self.cfg.broker,
                 portfolio,
                 slippage_bps=float(trader_cfg.get("slippage_bps", 0.0)),
             )

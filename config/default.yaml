@@ -33,12 +33,16 @@ indicators:
   - sector
 ai:
   enabled: true
-  model: claude-opus-4-7
-  timeframe: 1m
+  model: claude-sonnet-4-6
+  timeframe: 1w
   max_tokens: 2000
 data:
   lookback_days: 365
   interval: 1d
+  source: alpaca
+broker:
+  type: paper
+  paper_trading: true
 trader:
   interval_seconds: 300
   enforce_market_hours: false
