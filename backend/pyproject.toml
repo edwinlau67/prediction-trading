@@ -20,6 +20,9 @@ stock-predictor  = "prediction_trading._cli.stock_predictor:main"
 automated-trader = "prediction_trading._cli.automated_trader:main"
 scan-watchlist   = "prediction_trading._cli.scan_watchlist:main"
 
+[project.optional-dependencies]
+alpaca = ["alpaca-py>=0.30.0"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
