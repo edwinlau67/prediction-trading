@@ -29,6 +29,7 @@ except Exception:
     pass
 
 from prediction_trading import PredictionTradingSystem
+from prediction_trading.data_fetcher import create_data_fetcher
 from prediction_trading.reporting.base import BaseReportWriter
 
 
@@ -76,6 +77,14 @@ def _parse_args() -> argparse.Namespace:
         "--out", default="results",
         help="Root directory for the run folder (default: results/).",
     )
+    ap.add_argument(
+        "--data-source", choices=["yfinance", "alpaca", "both"], default="yfinance",
+        help="OHLCV data source (default: yfinance).",
+    )
+    ap.add_argument(
+        "--broker", choices=["paper", "alpaca"], default="paper",
+        help="Broker to use for order execution (default: paper).",
+    )
     return ap.parse_args()
 
 
@@ -100,12 +109,22 @@ def main() -> None:
     print(f"Mode       : {'DRY-RUN' if args.dry_run else 'paper trading'}")
     print(f"Market hrs : {'enforced' if args.market_hours else 'always on'}")
     print(f"Interval   : {args.interval}s")
+    print(f"Data source: {args.data_source}")
+    print(f"Broker     : {args.broker}")
 
     system = PredictionTradingSystem(
         ticker=args.tickers[0],
         initial_capital=args.capital,
         enable_ai=args.ai,
     )
+    system.cfg.data["source"] = args.data_source
+    system.cfg.broker["type"] = args.broker
+    # Re-create the data_fetcher with the CLI-specified source
+    system.data_fetcher = create_data_fetcher(
+        args.data_source, interval=system.cfg.data.get("interval", "1d")
+    )
+    if system.ai_predictor is not None:
+        system.ai_predictor._data_fetcher = system.data_fetcher
     trader = system.build_auto_trader(
         tickers=args.tickers,
         state_path=run_dir / "portfolio_state.json",

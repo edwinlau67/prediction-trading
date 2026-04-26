@@ -25,7 +25,7 @@ try:
 except Exception:
     pass
 
-from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.data_fetcher import DataFetcher, create_data_fetcher
 from prediction_trading.indicators import TechnicalIndicators
 from prediction_trading.logger import get_logger
 from prediction_trading.prediction import (
@@ -81,6 +81,10 @@ def _parse_args() -> argparse.Namespace:
         "--4h", dest="use_4h", action="store_true",
         help="Fetch 4-hour OHLCV and add confluence bonus when 4H agrees with daily.",
     )
+    ap.add_argument(
+        "--data-source", choices=["yfinance", "alpaca", "both"], default="yfinance",
+        help="OHLCV data source (default: yfinance).",
+    )
     return ap.parse_args()
 
 
@@ -92,7 +96,7 @@ def main() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     use_ai = bool(api_key) and not args.no_ai
 
-    data_fetcher = DataFetcher()
+    data_fetcher = create_data_fetcher(args.data_source)
     scorer = SignalScorer(categories=cats)
     ai = AIPredictor(
         api_key=api_key if use_ai else None,
@@ -132,7 +136,7 @@ def main() -> None:
             df_4h = None
             if args.use_4h:
                 try:
-                    fetcher_4h = DataFetcher(interval="1h")
+                    fetcher_4h = create_data_fetcher(args.data_source, interval="1h")
                     ohlcv_4h = fetcher_4h.fetch_history(ticker.upper(), lookback_days=90)
                     rules = {"Open": "first", "High": "max", "Low": "min",
                              "Close": "last", "Volume": "sum"}
