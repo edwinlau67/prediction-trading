@@ -7,7 +7,10 @@ from pathlib import Path
 import streamlit as st
 
 from ui.components import candlestick_chart, prediction_card
-from ui.state import PREDICT_CHART_PATH, PREDICT_OHLCV, PREDICT_RESULT, PREDICT_TICKER
+from ui.state import (
+    PREDICT_CHART_PATH, PREDICT_MACRO_CONTEXT, PREDICT_OHLCV,
+    PREDICT_RESULT, PREDICT_TICKER,
+)
 
 _TIMEFRAMES = ["1d", "1w", "1m", "3m", "6m", "ytd", "1y", "2y", "5y"]
 _ALL_CATEGORIES = ["trend", "momentum", "volatility", "volume", "support", "fundamental"]
@@ -64,6 +67,8 @@ def render() -> None:
 
         with tab_signal:
             prediction_card(prediction)
+            _render_timing_card(getattr(prediction, "timing", None))
+            _render_index_table(st.session_state.get(PREDICT_MACRO_CONTEXT))
 
         with tab_chart:
             if ohlcv is not None:
@@ -130,6 +135,12 @@ def _run_prediction(
 
         market = system.fetch()
 
+        # Fetch macro context (index cross-reference + scoring enrichment)
+        try:
+            market.macro_context = system.data_fetcher.fetch_macro_context()
+        except Exception:
+            pass
+
         df_4h = None
         if use_4h:
             try:
@@ -153,12 +164,14 @@ def _run_prediction(
             categories=tuple(categories) if categories else None,
             timeframe=timeframe,
             out_path=chart_path,
+            macro_context=market.macro_context,
         )
 
         st.session_state[PREDICT_RESULT] = prediction
         st.session_state[PREDICT_OHLCV] = market.ohlcv
         st.session_state[PREDICT_CHART_PATH] = rendered
         st.session_state[PREDICT_TICKER] = ticker
+        st.session_state[PREDICT_MACRO_CONTEXT] = market.macro_context
 
         if save_report:
             system._market = market
@@ -167,3 +180,107 @@ def _run_prediction(
 
     except Exception as exc:
         st.error(f"Prediction failed: {exc}")
+
+
+_TIMING_COLORS = {
+    "BUY_NOW": "#00d25b",
+    "BUY_ON_DIP": "#f0b429",
+    "BUY_ON_BREAKOUT": "#58a6ff",
+    "SELL_NOW": "#ff4b4b",
+    "SELL_TRAILING": "#ff7f0e",
+    "HOLD": "#8b949e",
+    "WAIT": "#8b949e",
+}
+_TIMING_LABELS = {
+    "BUY_NOW": "BUY NOW",
+    "BUY_ON_DIP": "BUY ON DIP",
+    "BUY_ON_BREAKOUT": "BREAKOUT ENTRY",
+    "SELL_NOW": "SELL NOW",
+    "SELL_TRAILING": "TRAILING STOP",
+    "HOLD": "HOLD",
+    "WAIT": "WAIT",
+}
+
+
+def _render_timing_card(timing) -> None:
+    if timing is None:
+        return
+    action = getattr(timing, "action", "WAIT")
+    reason = getattr(timing, "reason", "")
+    color = _TIMING_COLORS.get(action, "#8b949e")
+    label = _TIMING_LABELS.get(action, action)
+
+    st.markdown(
+        f'<div class="pt-timing-card" style="border-left:3px solid {color}">'
+        f'<span class="pt-timing-label">Timing Recommendation</span><br/>'
+        f'<span style="background:{color};color:white;padding:2px 10px;'
+        f'border-radius:3px;font-weight:700;font-size:0.85rem">{label}</span>'
+        f'&nbsp;&nbsp;<span class="pt-timing-reason">{reason}</span>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    entry = getattr(timing, "entry_price", None)
+    stop = getattr(timing, "stop_loss", None)
+    take_profit = getattr(timing, "take_profit", None)
+    metrics = [(v, lbl) for v, lbl in [
+        (entry, "Entry"), (stop, "Stop Loss"), (take_profit, "Take Profit")
+    ] if v is not None]
+    if metrics:
+        cols = st.columns(len(metrics))
+        for col, (val, lbl) in zip(cols, metrics):
+            with col:
+                st.metric(lbl, f"${val:,.2f}")
+
+
+def _render_index_table(macro_ctx) -> None:
+    if macro_ctx is None:
+        return
+    indexes = getattr(macro_ctx, "indexes", [])
+    if not indexes:
+        return
+
+    dark = st.session_state.get("theme_dark", False)
+    _TREND_COLOR = {
+        "↑ Above SMA50": "#00d25b" if dark else "#1a7f37",
+        "↓ Below SMA50": "#ff4b4b" if dark else "#cf222e",
+    }
+    _CHG_POS = "#00d25b" if dark else "#1a7f37"
+    _CHG_NEG = "#ff4b4b" if dark else "#cf222e"
+    _CHG_COLS = ["1D %", "5D %", "30D %"]
+
+    rows = []
+    for idx in indexes:
+        price = idx.price
+        trend = ("↑ Above SMA50" if idx.above_sma50 is True
+                 else "↓ Below SMA50" if idx.above_sma50 is False else "—")
+        rows.append({
+            "Index": idx.name,
+            "Price": f"${price:,.2f}" if price else "—",
+            "1D %": f"{idx.change_1d_pct:+.2f}%" if idx.change_1d_pct is not None else "—",
+            "5D %": f"{idx.change_5d_pct:+.2f}%" if idx.change_5d_pct is not None else "—",
+            "30D %": f"{idx.change_30d_pct:+.2f}%" if idx.change_30d_pct is not None else "—",
+            "Trend": trend,
+        })
+
+    headers = list(rows[0].keys()) if rows else []
+    header_html = "".join(f"<th class='pt-idx-th'>{h}</th>" for h in headers)
+    body_html = ""
+    for row in rows:
+        cells = ""
+        for col, val in row.items():
+            color = ""
+            if col in _CHG_COLS and val not in ("—", ""):
+                color = f"color:{_CHG_POS}" if val.startswith("+") else f"color:{_CHG_NEG}"
+            elif col == "Trend":
+                color = f"color:{_TREND_COLOR.get(val, '')}"
+            cells += f"<td class='pt-idx-td' style='{color}'>{val}</td>"
+        body_html += f"<tr>{cells}</tr>"
+
+    st.markdown("#### Market Index Overview")
+    st.markdown(
+        f"<table style='width:100%;border-collapse:collapse;font-size:0.9rem'>"
+        f"<thead><tr>{header_html}</tr></thead>"
+        f"<tbody>{body_html}</tbody></table>",
+        unsafe_allow_html=True,
+    )
