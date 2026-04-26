@@ -1,10 +1,12 @@
-"""Data fetcher backed by Yahoo Finance (yfinance).
+"""Data fetcher with pluggable data sources.
 
-Returns a uniform OHLCV DataFrame plus a fundamentals dict so downstream
+Supports Yahoo Finance (yfinance), Alpaca Markets, or both.
+Returns a uniform OHLCV DataFrame plus fundamentals/context so downstream
 indicators and the AI predictor can consume a single source of truth.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -119,6 +121,7 @@ class MarketData:
     news_context: NewsContext | None = None
     macro_context: MacroContext | None = None
     sector_context: SectorContext | None = None
+    data_feed: str = "yfinance"  # "yfinance" | "alpaca/SIP" | "alpaca/IEX"
 
     @property
     def as_of(self) -> pd.Timestamp:
@@ -457,4 +460,171 @@ class DataFetcher:
             news_context=news_ctx,
             macro_context=macro_ctx,
             sector_context=sector_ctx,
+            data_feed=getattr(self, "_last_feed", "yfinance"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Alpaca integration (optional — requires alpaca-py)
+# ---------------------------------------------------------------------------
+try:
+    from alpaca.data.historical import StockHistoricalDataClient as _AlpacaHistClient
+    from alpaca.data.requests import StockBarsRequest as _StockBarsRequest
+    from alpaca.data.timeframe import TimeFrame as _AlpacaTF, TimeFrameUnit as _TFUnit
+    from alpaca.data.enums import DataFeed as _DataFeed
+    _ALPACA_AVAILABLE = True
+except ImportError:
+    _AlpacaHistClient = None  # type: ignore[assignment,misc]
+    _StockBarsRequest = None  # type: ignore[assignment]
+    _AlpacaTF = None          # type: ignore[assignment]
+    _TFUnit = None            # type: ignore[assignment]
+    _DataFeed = None          # type: ignore[assignment]
+    _ALPACA_AVAILABLE = False
+
+
+class AlpacaDataFetcher(DataFetcher):
+    """DataFetcher backed by Alpaca Markets historical data API.
+
+    Overrides ``fetch_history`` only; news/macro/sector context
+    falls through to the yfinance implementation in the parent.
+    Requires ``ALPACA_API_KEY`` and ``ALPACA_API_SECRET`` env vars.
+    """
+
+    def __init__(self, *, interval: str = "1d") -> None:
+        if not _ALPACA_AVAILABLE:
+            raise ImportError(
+                "alpaca-py is not installed. "
+                "Run `pip install alpaca-py` or `uv pip install alpaca-py`."
+            )
+        # Parent __init__ checks yfinance (needed for news/macro/sector fallbacks)
+        super().__init__(interval=interval)
+        api_key = os.environ.get("ALPACA_API_KEY", "")
+        api_secret = os.environ.get("ALPACA_API_SECRET", "")
+        self._alpaca_client = _AlpacaHistClient(api_key, api_secret)
+
+    def fetch_history(
+        self,
+        ticker: str,
+        *,
+        start: str | datetime | None = None,
+        end: str | datetime | None = None,
+        lookback_days: int | None = None,
+    ) -> pd.DataFrame:
+        if start is None and lookback_days is not None:
+            start = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        if end is None:
+            end = datetime.now(timezone.utc)
+
+        self._last_feed = "alpaca/SIP"
+        try:
+            request = _StockBarsRequest(
+                symbol_or_symbols=ticker.upper(),
+                timeframe=self._alpaca_timeframe(self.interval),
+                start=start,
+                end=end,
+                feed=_DataFeed.SIP,
+            )
+            bars = self._alpaca_client.get_stock_bars(request)
+        except Exception as _sip_exc:
+            import logging
+            logging.getLogger("prediction_trading.data_fetcher").info(
+                "SIP feed unavailable (%s) — falling back to IEX", _sip_exc
+            )
+            self._last_feed = "alpaca/IEX"
+            request = _StockBarsRequest(
+                symbol_or_symbols=ticker.upper(),
+                timeframe=self._alpaca_timeframe(self.interval),
+                start=start,
+                end=end,
+                feed=_DataFeed.IEX,
+            )
+            bars = self._alpaca_client.get_stock_bars(request)
+        df = bars.df
+
+        if df is None or df.empty:
+            raise ValueError(f"No price history returned from Alpaca for {ticker!r}.")
+
+        # Alpaca returns a MultiIndex (symbol, timestamp) — flatten to timestamp
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.reset_index(level=0, drop=True)
+
+        # Normalise column names to match yfinance output
+        col_map = {
+            "open": "Open", "high": "High", "low": "Low",
+            "close": "Close", "volume": "Volume",
+        }
+        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        df.index = pd.to_datetime(df.index)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+
+        # Apply same OHLC quality guard as parent
+        valid = (
+            (df["High"] >= df["Open"]) & (df["High"] >= df["Close"]) &
+            (df["Low"] <= df["Open"]) & (df["Low"] <= df["Close"]) &
+            (df["High"] >= df["Low"])
+        )
+        n_bad = (~valid).sum()
+        if n_bad > 0:
+            import logging
+            logging.getLogger("prediction_trading.data_fetcher").warning(
+                "Dropped %d bar(s) with invalid OHLC for %s (Alpaca)", n_bad, ticker
+            )
+            df = df[valid]
+        return df
+
+    @staticmethod
+    def _alpaca_timeframe(interval: str) -> "_AlpacaTF":
+        # Only evaluated when alpaca-py is installed (guarded by _ALPACA_AVAILABLE check)
+        _map: dict[str, tuple] = {
+            "1m":  (1,  _TFUnit.Minute),
+            "5m":  (5,  _TFUnit.Minute),
+            "15m": (15, _TFUnit.Minute),
+            "1h":  (1,  _TFUnit.Hour),
+            "4h":  (4,  _TFUnit.Hour),
+            "1d":  (1,  _TFUnit.Day),
+            "1wk": (1,  _TFUnit.Week),
+        }
+        amount, unit = _map.get(interval, (1, _TFUnit.Day))
+        return _AlpacaTF(amount, unit)
+
+
+class _MergedDataFetcher(DataFetcher):
+    """Prefer Alpaca for recency; fall back to yfinance for full history."""
+
+    def __init__(self, *, interval: str = "1d") -> None:
+        super().__init__(interval=interval)
+        self._alpaca = AlpacaDataFetcher(interval=interval)
+
+    def fetch_history(
+        self,
+        ticker: str,
+        *,
+        start: str | datetime | None = None,
+        end: str | datetime | None = None,
+        lookback_days: int | None = None,
+    ) -> pd.DataFrame:
+        try:
+            df = self._alpaca.fetch_history(
+                ticker, start=start, end=end, lookback_days=lookback_days
+            )
+            self._last_feed = self._alpaca._last_feed
+            return df
+        except Exception:
+            self._last_feed = "yfinance"
+            return super().fetch_history(
+                ticker, start=start, end=end, lookback_days=lookback_days
+            )
+
+
+def create_data_fetcher(source: str = "yfinance", interval: str = "1d") -> DataFetcher:
+    """Return the correct DataFetcher based on config source key."""
+    source = source.lower()
+    if source == "yfinance":
+        return DataFetcher(interval=interval)
+    if source == "alpaca":
+        return AlpacaDataFetcher(interval=interval)
+    if source == "both":
+        return _MergedDataFetcher(interval=interval)
+    raise ValueError(f"Unknown data source: {source!r}. Choose yfinance, alpaca, or both.")
