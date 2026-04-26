@@ -226,6 +226,64 @@ h2, h3 { color: #e8edf3 !important; }
 p, li { color: #d0d8e4 !important; }
 label, [data-testid="stWidgetLabel"] p { color: #c8d0dc !important; }
 small, .caption { color: #b0b8c4 !important; }
+
+/* ── Dropdown popups ─────────────────────────────────────────────── */
+[data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"] {
+    background: #1c2128 !important;
+    border-color: #3d444d !important;
+}
+[role="option"], [data-baseweb="menu-item"] {
+    color: #e8edf3 !important;
+    background: #1c2128 !important;
+}
+[role="option"]:hover, [data-baseweb="menu-item"]:hover {
+    background: #2d333b !important;
+}
+
+/* ── Multiselect tag chips ───────────────────────────────────────── */
+[data-baseweb="tag"] {
+    background: #1a4731 !important;
+    color: #26d96a !important;
+    border-color: #26d96a !important;
+}
+[data-baseweb="tag"] span { color: #26d96a !important; }
+
+/* ── Baseweb select inner container (multiselect) ────────────────── */
+[data-baseweb="select"] > div,
+[data-baseweb="select"] > div > div {
+    background: #1c2128 !important;
+    border-color: #3d444d !important;
+    color: #e8edf3 !important;
+}
+[data-baseweb="select"] input {
+    background: transparent !important;
+    color: #e8edf3 !important;
+    caret-color: #e8edf3 !important;
+}
+[data-baseweb="menu"] li,
+[data-baseweb="menu"] [role="option"],
+[data-baseweb="no-result"] {
+    background: #1c2128 !important;
+    color: #b0b8c4 !important;
+}
+
+/* ── File uploader ───────────────────────────────────────────────── */
+[data-testid="stFileUploader"] > div {
+    background: #1c2128 !important;
+    border-color: #3d444d !important;
+    color: #e8edf3 !important;
+}
+[data-testid="stFileUploader"] small,
+[data-testid="stFileUploader"] span { color: #b0b8c4 !important; }
+
+/* ── Timing card ─────────────────────────────────────────────────── */
+.pt-timing-card { background: #0d1117; border-radius: 4px; padding: 8px 12px; margin: 12px 0; }
+.pt-timing-label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+.pt-timing-reason { color: #c9d1d9; font-size: 0.85rem; }
+
+/* ── Index table ─────────────────────────────────────────────────── */
+.pt-idx-th { padding: 8px 14px; text-align: left; color: #8b949e; font-size: 0.78rem; font-weight: 600; border-bottom: 2px solid #30363d; }
+.pt-idx-td { padding: 8px 14px; border-bottom: 1px solid #21262d; }
 </style>
 """
 
@@ -454,6 +512,64 @@ h2, h3 { color: #24292f !important; }
 p, li { color: #24292f !important; }
 label, [data-testid="stWidgetLabel"] p { color: #57606a !important; }
 small, .caption { color: #8c959f !important; }
+
+/* ── Dropdown popups ─────────────────────────────────────────────── */
+[data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"] {
+    background: #ffffff !important;
+    border-color: #d0d7de !important;
+}
+[role="option"], [data-baseweb="menu-item"] {
+    color: #24292f !important;
+    background: #ffffff !important;
+}
+[role="option"]:hover, [data-baseweb="menu-item"]:hover {
+    background: #f6f8fa !important;
+}
+
+/* ── Multiselect tag chips ───────────────────────────────────────── */
+[data-baseweb="tag"] {
+    background: #dafbe1 !important;
+    color: #1a7f37 !important;
+    border-color: #1a7f37 !important;
+}
+[data-baseweb="tag"] span { color: #1a7f37 !important; }
+
+/* ── Baseweb select inner container (multiselect) ────────────────── */
+[data-baseweb="select"] > div,
+[data-baseweb="select"] > div > div {
+    background: #ffffff !important;
+    border-color: #d0d7de !important;
+    color: #24292f !important;
+}
+[data-baseweb="select"] input {
+    background: transparent !important;
+    color: #24292f !important;
+    caret-color: #24292f !important;
+}
+[data-baseweb="menu"] li,
+[data-baseweb="menu"] [role="option"],
+[data-baseweb="no-result"] {
+    background: #ffffff !important;
+    color: #57606a !important;
+}
+
+/* ── File uploader ───────────────────────────────────────────────── */
+[data-testid="stFileUploader"] > div {
+    background: #ffffff !important;
+    border-color: #d0d7de !important;
+    color: #24292f !important;
+}
+[data-testid="stFileUploader"] small,
+[data-testid="stFileUploader"] span { color: #57606a !important; }
+
+/* ── Timing card ─────────────────────────────────────────────────── */
+.pt-timing-card { background: #f6f8fa; border-radius: 4px; padding: 8px 12px; margin: 12px 0; }
+.pt-timing-label { font-size: 0.75rem; color: #57606a; text-transform: uppercase; letter-spacing: 1px; }
+.pt-timing-reason { color: #24292f; font-size: 0.85rem; }
+
+/* ── Index table ─────────────────────────────────────────────────── */
+.pt-idx-th { padding: 8px 14px; text-align: left; color: #57606a; font-size: 0.78rem; font-weight: 600; border-bottom: 2px solid #d0d7de; }
+.pt-idx-td { padding: 8px 14px; border-bottom: 1px solid #eaecef; }
 </style>
 """
 

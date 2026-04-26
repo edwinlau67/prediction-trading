@@ -14,30 +14,41 @@ except ImportError:
     Prediction = object  # type: ignore[misc,assignment]
     Trade = object       # type: ignore[misc,assignment]
 
-# Dark broker color palette
-_COLORS = {
-    "bullish": "#00d25b",
-    "bearish": "#ff4b4b",
-    "neutral": "#8b949e",
-}
-
 _LABELS = {
     "bullish": "BUY",
     "bearish": "SELL",
     "neutral": "HOLD",
 }
 
-# Plotly dark chart template
-_CHART_LAYOUT = dict(
-    template="plotly_dark",
-    paper_bgcolor="#0d1117",
-    plot_bgcolor="#0d1117",
-    font=dict(color="#c9d1d9", family="-apple-system, BlinkMacSystemFont, sans-serif"),
-    xaxis=dict(gridcolor="#21262d", linecolor="#30363d", zeroline=False),
-    yaxis=dict(gridcolor="#21262d", linecolor="#30363d", zeroline=False),
-    margin=dict(l=0, r=0, t=36, b=0),
-    hovermode="x unified",
-)
+
+def _get_colors() -> dict[str, str]:
+    if st.session_state.get("theme_dark", False):
+        return {"bullish": "#00d25b", "bearish": "#ff4b4b", "neutral": "#8b949e"}
+    return {"bullish": "#1a7f37", "bearish": "#cf222e", "neutral": "#57606a"}
+
+
+def _get_chart_layout() -> dict:
+    if st.session_state.get("theme_dark", False):
+        return dict(
+            template="plotly_dark",
+            paper_bgcolor="#0d1117",
+            plot_bgcolor="#0d1117",
+            font=dict(color="#c9d1d9", family="-apple-system, BlinkMacSystemFont, sans-serif"),
+            xaxis=dict(gridcolor="#21262d", linecolor="#30363d", zeroline=False),
+            yaxis=dict(gridcolor="#21262d", linecolor="#30363d", zeroline=False),
+            margin=dict(l=0, r=0, t=36, b=0),
+            hovermode="x unified",
+        )
+    return dict(
+        template="plotly_white",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#f6f8fa",
+        font=dict(color="#24292f", family="-apple-system, BlinkMacSystemFont, sans-serif"),
+        xaxis=dict(gridcolor="#eaecef", linecolor="#d0d7de", zeroline=False),
+        yaxis=dict(gridcolor="#eaecef", linecolor="#d0d7de", zeroline=False),
+        margin=dict(l=0, r=0, t=36, b=0),
+        hovermode="x unified",
+    )
 
 
 def direction_badge(direction: str) -> str:
@@ -84,15 +95,17 @@ def metric_card(
 
 
 def confidence_badge(direction: str, confidence: float) -> None:
-    color = _COLORS.get(direction, _COLORS["neutral"])
+    colors = _get_colors()
+    color = colors.get(direction, colors["neutral"])
     label = _LABELS.get(direction, "HOLD")
     pct = int(confidence * 100)
+    muted = colors["neutral"]
     st.markdown(
         f'<div style="margin-bottom:8px">'
         f'<span class="{"badge-buy" if direction=="bullish" else "badge-sell" if direction=="bearish" else "badge-hold"}">'
         f'{label}</span> '
         f'<span style="font-size:1.4rem;font-weight:700;color:{color}">{pct}%</span>'
-        f'<span style="color:#8b949e;font-size:0.85rem"> confidence</span>'
+        f'<span style="color:{muted};font-size:0.85rem"> confidence</span>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -100,13 +113,15 @@ def confidence_badge(direction: str, confidence: float) -> None:
 
 
 def prediction_card(prediction) -> None:
-    """Render a compact dark card for a single Prediction result."""
+    """Render a compact card for a single Prediction result."""
     direction = getattr(prediction, "direction", "neutral")
     confidence = getattr(prediction, "confidence", 0.0)
     current_price = getattr(prediction, "current_price", None)
     price_target = getattr(prediction, "price_target", None)
     risk_level = getattr(prediction, "risk_level", "medium")
-    color = _COLORS.get(direction, _COLORS["neutral"])
+    colors = _get_colors()
+    color = colors.get(direction, colors["neutral"])
+    muted = colors["neutral"]
     badge_cls = {"bullish": "badge-buy", "bearish": "badge-sell"}.get(direction, "badge-hold")
     label = _LABELS.get(direction, "HOLD")
     pct = int(confidence * 100)
@@ -115,7 +130,7 @@ def prediction_card(prediction) -> None:
         f'<div class="pt-card" style="border-left:3px solid {color}">'
         f'<span class="{badge_cls}">{label}</span>'
         f'&nbsp;&nbsp;<span style="font-size:1.6rem;font-weight:800;color:{color}">{pct}%</span>'
-        f'<span style="color:#8b949e;font-size:0.9rem"> confidence</span>'
+        f'<span style="color:{muted};font-size:0.9rem"> confidence</span>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -139,6 +154,8 @@ def prediction_card(prediction) -> None:
         bear = [f for f in factors if getattr(f, "direction", "") == "bearish"]
 
         if bull or bear:
+            bull_color = colors["bullish"]
+            bear_color = colors["bearish"]
             col_b, col_s = st.columns(2)
             with col_b:
                 if bull:
@@ -147,7 +164,7 @@ def prediction_card(prediction) -> None:
                         detail = getattr(f, "detail", "")
                         label_txt = f"▲ {f.name}" + (f" — {detail}" if detail else "")
                         st.markdown(
-                            f'<div style="color:#00d25b;font-size:0.85rem;padding:2px 0">{label_txt}</div>',
+                            f'<div style="color:{bull_color};font-size:0.85rem;padding:2px 0">{label_txt}</div>',
                             unsafe_allow_html=True,
                         )
             with col_s:
@@ -157,7 +174,7 @@ def prediction_card(prediction) -> None:
                         detail = getattr(f, "detail", "")
                         label_txt = f"▼ {f.name}" + (f" — {detail}" if detail else "")
                         st.markdown(
-                            f'<div style="color:#ff4b4b;font-size:0.85rem;padding:2px 0">{label_txt}</div>',
+                            f'<div style="color:{bear_color};font-size:0.85rem;padding:2px 0">{label_txt}</div>',
                             unsafe_allow_html=True,
                         )
 
@@ -173,8 +190,10 @@ def equity_chart(
 
     dates = [row[0] for row in equity_curve]
     values = [row[1] for row in equity_curve]
+    colors = _get_colors()
+    chart_layout = _get_chart_layout()
     is_positive = values[-1] >= initial_capital if initial_capital else True
-    line_color = "#00d25b" if is_positive else "#ff4b4b"
+    line_color = colors["bullish"] if is_positive else colors["bearish"]
     fill_color = "rgba(0,210,91,0.1)" if is_positive else "rgba(255,75,75,0.1)"
 
     fig = go.Figure()
@@ -191,14 +210,14 @@ def equity_chart(
         fig.add_hline(
             y=initial_capital,
             line_dash="dash",
-            line_color="#30363d",
+            line_color=chart_layout["xaxis"]["linecolor"],
             annotation_text="Initial",
-            annotation_font_color="#8b949e",
+            annotation_font_color=colors["neutral"],
         )
-    layout = dict(**_CHART_LAYOUT)
+    layout = dict(**chart_layout)
     layout.update(
-        title=dict(text=title, font=dict(size=13, color="#8b949e")),
-        yaxis=dict(tickprefix="$", **_CHART_LAYOUT["yaxis"]),
+        title=dict(text=title, font=dict(size=13, color=colors["neutral"])),
+        yaxis=dict(tickprefix="$", **chart_layout["yaxis"]),
         height=300,
     )
     fig.update_layout(**layout)
@@ -217,10 +236,17 @@ def candlestick_chart(
     sell_signals: list | None = None,
     show_volume: bool = True,
 ) -> None:
-    """Full Plotly candlestick + volume chart in dark theme."""
+    """Full Plotly candlestick + volume chart."""
     if ohlcv is None or ohlcv.empty:
         st.info("No price data available.")
         return
+
+    colors = _get_colors()
+    chart_layout = _get_chart_layout()
+    bull_color = colors["bullish"]
+    bear_color = colors["bearish"]
+    grid_color = chart_layout["xaxis"]["gridcolor"]
+    line_color = chart_layout["xaxis"]["linecolor"]
 
     tail = ohlcv.tail(120)
 
@@ -237,21 +263,21 @@ def candlestick_chart(
         x=tail.index,
         open=tail["Open"], high=tail["High"],
         low=tail["Low"], close=tail["Close"],
-        increasing=dict(line=dict(color="#00d25b"), fillcolor="#00d25b"),
-        decreasing=dict(line=dict(color="#ff4b4b"), fillcolor="#ff4b4b"),
+        increasing=dict(line=dict(color=bull_color), fillcolor=bull_color),
+        decreasing=dict(line=dict(color=bear_color), fillcolor=bear_color),
         name="Price",
         showlegend=False,
     ), row=1, col=1)
 
     # SMA overlays
-    for col_name, color, label in [
+    for col_name, sma_color, label in [
         ("SMA20", "#f0b429", "SMA20"),
         ("SMA50", "#58a6ff", "SMA50"),
     ]:
         if col_name in tail.columns:
             fig.add_trace(go.Scatter(
                 x=tail.index, y=tail[col_name],
-                mode="lines", line=dict(color=color, width=1.2),
+                mode="lines", line=dict(color=sma_color, width=1.2),
                 name=label, opacity=0.8,
             ), row=1, col=1)
 
@@ -261,13 +287,13 @@ def candlestick_chart(
                       annotation_text=f"Entry ${entry_price:.2f}",
                       annotation_font_color="#58a6ff", row=1, col=1)
     if stop_price:
-        fig.add_hline(y=stop_price, line_color="#ff4b4b", line_dash="dash",
+        fig.add_hline(y=stop_price, line_color=bear_color, line_dash="dash",
                       annotation_text=f"Stop ${stop_price:.2f}",
-                      annotation_font_color="#ff4b4b", row=1, col=1)
+                      annotation_font_color=bear_color, row=1, col=1)
     if target_price:
-        fig.add_hline(y=target_price, line_color="#00d25b", line_dash="dash",
+        fig.add_hline(y=target_price, line_color=bull_color, line_dash="dash",
                       annotation_text=f"Target ${target_price:.2f}",
-                      annotation_font_color="#00d25b", row=1, col=1)
+                      annotation_font_color=bull_color, row=1, col=1)
 
     # Buy/sell markers
     if buy_signals:
@@ -275,7 +301,7 @@ def candlestick_chart(
         fig.add_trace(go.Scatter(
             x=list(dates_b), y=list(prices_b),
             mode="markers",
-            marker=dict(symbol="triangle-up", size=10, color="#00d25b"),
+            marker=dict(symbol="triangle-up", size=10, color=bull_color),
             name="Buy", showlegend=True,
         ), row=1, col=1)
     if sell_signals:
@@ -283,14 +309,14 @@ def candlestick_chart(
         fig.add_trace(go.Scatter(
             x=list(dates_s), y=list(prices_s),
             mode="markers",
-            marker=dict(symbol="triangle-down", size=10, color="#ff4b4b"),
+            marker=dict(symbol="triangle-down", size=10, color=bear_color),
             name="Sell", showlegend=True,
         ), row=1, col=1)
 
     # Volume bars
     if show_volume and "Volume" in tail.columns:
         vol_colors = [
-            "#00d25b" if c >= o else "#ff4b4b"
+            bull_color if c >= o else bear_color
             for c, o in zip(tail["Close"], tail["Open"])
         ]
         fig.add_trace(go.Bar(
@@ -299,16 +325,16 @@ def candlestick_chart(
             showlegend=False, opacity=0.7,
         ), row=2, col=1)
 
-    layout = dict(**_CHART_LAYOUT)
+    layout = dict(**chart_layout)
     layout.update(
-        title=dict(text=title, font=dict(size=13, color="#8b949e")),
+        title=dict(text=title, font=dict(size=13, color=colors["neutral"])),
         height=height,
         xaxis_rangeslider_visible=False,
         legend=dict(orientation="h", y=1.02, x=0, font=dict(size=11)),
     )
     fig.update_layout(**layout)
-    fig.update_xaxes(gridcolor="#21262d", linecolor="#30363d")
-    fig.update_yaxes(gridcolor="#21262d", linecolor="#30363d")
+    fig.update_xaxes(gridcolor=grid_color, linecolor=line_color)
+    fig.update_yaxes(gridcolor=grid_color, linecolor=line_color)
     st.plotly_chart(fig, use_container_width=True)
 
 

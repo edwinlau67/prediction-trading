@@ -13,6 +13,7 @@ PREDICT_RESULT = "predict_result"
 PREDICT_OHLCV = "predict_ohlcv"
 PREDICT_CHART_PATH = "predict_chart_path"
 PREDICT_TICKER = "predict_ticker"
+PREDICT_MACRO_CONTEXT = "predict_macro_context"
 
 # Backtest page
 BT_RESULT = "bt_result"
@@ -50,6 +51,7 @@ _DEFAULTS: dict = {
     PREDICT_OHLCV: None,
     PREDICT_CHART_PATH: None,
     PREDICT_TICKER: "",
+    PREDICT_MACRO_CONTEXT: None,
     BT_RESULT: None,
     BT_TICKER: "",
     BT_OHLCV: None,
