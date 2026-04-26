@@ -5,7 +5,7 @@ Launch with:
 """
 import streamlit as st
 
-from ui.pages import backtest, dashboard, predict, scanner, settings, trading
+from ui.pages import backtest, dashboard, portfolio_builder, predict, scanner, settings, trading
 from ui.pages import alerts as alerts_page
 from ui.state import CURRENT_PAGE, init_session_state
 from ui.theme import inject_theme
@@ -34,6 +34,7 @@ NAV_ITEMS = [
     ("🔍", "Scanner"),
     ("📅", "Backtest"),
     ("⚡", "Trading"),
+    ("🧱", "Portfolio Builder"),
     ("🔔", "Alerts"),
     ("⚙️", "Settings"),
 ]
@@ -44,6 +45,7 @@ PAGE_MODULES = {
     "Scanner": scanner,
     "Backtest": backtest,
     "Trading": trading,
+    "Portfolio Builder": portfolio_builder,
     "Alerts": alerts_page,
     "Settings": settings,
 }
