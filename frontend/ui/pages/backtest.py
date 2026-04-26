@@ -169,9 +169,9 @@ def _show_results(result, initial_capital: float = 10_000.0) -> None:
                 for t in getattr(portfolio, "closed_trades", [])
             ]
         if trades_rows:
-            html = pd.DataFrame(trades_rows).to_html(index=False, border=0, escape=False)
+            html_table = pd.DataFrame(trades_rows).to_html(index=False, border=0, escape=True)
             st.markdown(
-                f'<div style="overflow-x:auto;max-height:500px;overflow-y:auto">{html}</div>',
+                f'<div style="overflow-x:auto;max-height:500px;overflow-y:auto">{html_table}</div>',
                 unsafe_allow_html=True,
             )
         else:

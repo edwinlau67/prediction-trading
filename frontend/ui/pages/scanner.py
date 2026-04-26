@@ -1,6 +1,7 @@
 """Scanner page — parallel watchlist screening."""
 from __future__ import annotations
 
+import html
 import io
 
 import pandas as pd
@@ -126,7 +127,7 @@ def _show_results(results: list) -> None:
         c3.markdown(f"{confidence:.0%}")
         c4.markdown(f"${price:.2f}" if price else "—")
         c5.markdown(", ".join(top_factors[:3]) if top_factors else "—")
-        c6.markdown(f'<span style="color:#ff4b4b;font-size:0.8em">{error}</span>' if error else "✓", unsafe_allow_html=True)
+        c6.markdown(f'<span style="color:#ff4b4b;font-size:0.8em">{html.escape(error)}</span>' if error else "✓", unsafe_allow_html=True)
 
         rows.append({
             "Ticker": ticker,

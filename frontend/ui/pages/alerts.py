@@ -1,6 +1,7 @@
 """Alerts Manager page — price/confidence/P&L trigger management."""
 from __future__ import annotations
 
+import html
 import json
 from datetime import datetime
 from pathlib import Path
@@ -54,10 +55,10 @@ def render() -> None:
             for idx, alert in enumerate(active):
                 col_info, col_del = st.columns([5, 1])
                 with col_info:
-                    ticker = alert.get("ticker", "")
-                    ttype = alert.get("type", "")
-                    value = alert.get("value", "")
-                    created = alert.get("created", "")
+                    ticker = html.escape(alert.get("ticker", ""))
+                    ttype = html.escape(alert.get("type", ""))
+                    value = html.escape(str(alert.get("value", "")))
+                    created = html.escape(alert.get("created", ""))
                     color = "#00d25b" if "above" in ttype or "≥" in ttype else "#ff4b4b"
                     st.markdown(
                         f'<div class="pt-card" style="border-left:3px solid {color}">'
@@ -119,15 +120,20 @@ def render() -> None:
             st.markdown(f"**{len(triggered)} triggered alert(s)**")
             for entry in reversed(triggered[-50:]):
                 color = "#00d25b" if "above" in entry.get("type", "") else "#ff4b4b"
+                t_ticker = html.escape(entry.get("ticker", ""))
+                t_fired = html.escape(entry.get("fired_at", ""))
+                t_type = html.escape(entry.get("type", ""))
+                t_value = html.escape(str(entry.get("value", "")))
+                t_actual = html.escape(str(entry.get("actual", "")))
                 st.markdown(
                     f'<div class="pt-card">'
                     f'<div style="display:flex;justify-content:space-between">'
-                    f'<span style="font-weight:700;color:#e6edf3">{entry.get("ticker","")}</span>'
-                    f'<span style="color:#8b949e;font-size:0.8rem">{entry.get("fired_at","")}</span>'
+                    f'<span style="font-weight:700;color:#e6edf3">{t_ticker}</span>'
+                    f'<span style="color:#8b949e;font-size:0.8rem">{t_fired}</span>'
                     f"</div>"
                     f'<div style="color:{color};font-size:0.9rem">'
-                    f'{entry.get("type","")} {entry.get("value","")} — '
-                    f'actual: <strong>{entry.get("actual","")}</strong>'
+                    f'{t_type} {t_value} — '
+                    f'actual: <strong>{t_actual}</strong>'
                     f"</div></div>",
                     unsafe_allow_html=True,
                 )
