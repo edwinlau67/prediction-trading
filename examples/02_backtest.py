@@ -1,21 +1,23 @@
 """Run a full backtest and write a Markdown + charts report.
 
 Run:
-    uv run python examples/02_backtest.py --ticker AAPL --start 2023-01-01 --end 2024-01-01
+    uv run python examples/02_backtest.py --ticker AAPL
 """
 from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime, timedelta
 
 from prediction_trading import PredictionTradingSystem
 
 
 def main() -> int:
+    _today = datetime.now()
     parser = argparse.ArgumentParser()
     parser.add_argument("--ticker", default="AAPL")
-    parser.add_argument("--start", default="2023-01-01")
-    parser.add_argument("--end", default="2024-01-01")
+    parser.add_argument("--start", default=(_today - timedelta(days=365)).strftime("%Y-%m-%d"))
+    parser.add_argument("--end", default=_today.strftime("%Y-%m-%d"))
     parser.add_argument("--capital", type=float, default=10_000.0)
     parser.add_argument("--ai", action="store_true")
     args = parser.parse_args()

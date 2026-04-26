@@ -1,7 +1,7 @@
 """Backtest page — historical simulation with equity curve and trade log."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import streamlit as st
 
@@ -17,9 +17,9 @@ def render() -> None:
     with col1:
         ticker = st.text_input("Ticker", "AAPL").upper().strip()
     with col2:
-        start = st.date_input("Start Date", value=date(2023, 1, 1))
+        start = st.date_input("Start Date", value=date.today() - timedelta(days=365))
     with col3:
-        end = st.date_input("End Date", value=date(2024, 1, 1))
+        end = st.date_input("End Date", value=date.today())
 
     col4, col5 = st.columns(2)
     with col4:
