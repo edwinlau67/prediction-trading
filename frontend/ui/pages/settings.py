@@ -7,6 +7,7 @@ from pathlib import Path
 import streamlit as st
 import yaml
 
+from prediction_trading.prediction.factor import ALL_CATEGORIES
 from ui.state import ACTIVE_PROFILE, SETTINGS_DIRTY
 
 _cfg_dir = Path(os.environ.get("PREDICTION_TRADING_CONFIG_DIR", "config"))
@@ -124,12 +125,11 @@ def render() -> None:
         )
 
     # ── Indicators ────────────────────────────────────────────────────────────
-    _ALL_CATS = ["trend", "momentum", "volatility", "volume", "support", "fundamental"]
     st.subheader("Indicator Categories")
     indicators["categories"] = st.multiselect(
         "Active Categories",
-        _ALL_CATS,
-        default=indicators.get("categories") or _ALL_CATS,
+        list(ALL_CATEGORIES),
+        default=indicators.get("categories") or list(ALL_CATEGORIES),
         help="Controls which rules run, which chart panels render, and what the AI prompt includes.",
     )
 
