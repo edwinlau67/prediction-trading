@@ -18,7 +18,7 @@ def render() -> None:
     st.markdown("## 🧱 Portfolio Builder")
     st.caption(
         "Analyze a mix of stocks and ETFs: correlation heatmap, sector exposure, "
-        "and diversification recommendations."
+        "and diversification recommendations.  ·  Data: **yfinance**  ·  Reference: **ETF catalogue (built-in)**"
     )
 
     col_input, col_btn = st.columns([3, 1])
