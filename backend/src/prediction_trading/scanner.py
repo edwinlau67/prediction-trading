@@ -8,7 +8,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-from .data_fetcher import DataFetcher
+from .data_fetcher import DataFetcher, create_data_fetcher
 from .indicators import TechnicalIndicators
 from .prediction.factor import ALL_CATEGORIES
 from .prediction.signal_scorer import SignalScorer
@@ -34,12 +34,13 @@ class WatchlistScanner:
         lookback_days: int = 365,
         min_confidence: float = 0.0,
         workers: int = 4,
+        data_source: str = "yfinance",
     ) -> None:
         self.categories = tuple(categories) if categories else ALL_CATEGORIES
         self.lookback_days = lookback_days
         self.min_confidence = min_confidence
         self.workers = max(1, workers)
-        self._fetcher = DataFetcher()
+        self._fetcher = create_data_fetcher(data_source)
         self._scorer = SignalScorer(categories=self.categories)
 
     def scan(self, tickers: list[str]) -> list[ScanResult]:
