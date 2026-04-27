@@ -1,4 +1,4 @@
-"""Run a single automated-trading cycle against a live paper broker.
+"""Run a single automated-trading cycle against a paper or Alpaca broker.
 
 This example mirrors what ``automated-trader --once --dry-run`` does,
 but as a plain Python script so you can inspect the returned
@@ -6,6 +6,11 @@ but as a plain Python script so you can inspect the returned
 
 Run:
     uv run python examples/04_automated_trading.py --tickers AAPL TSLA
+    uv run python examples/04_automated_trading.py --tickers AAPL --broker alpaca
+    uv run python examples/04_automated_trading.py --tickers AAPL --data-source alpaca
+
+Alpaca requires env vars: ALPACA_API_KEY and ALPACA_API_SECRET.
+Install the SDK first: uv pip install alpaca-py
 """
 from __future__ import annotations
 
@@ -13,6 +18,8 @@ import argparse
 import sys
 
 from prediction_trading import PredictionTradingSystem
+from prediction_trading.data_fetcher import create_data_fetcher
+from prediction_trading.trading.broker import AlpacaBroker
 
 
 def main() -> int:
@@ -22,6 +29,11 @@ def main() -> int:
     parser.add_argument("--capital", type=float, default=10_000.0)
     parser.add_argument("--ai", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--broker", choices=["paper", "alpaca"], default="paper",
+                        help="Broker backend (default: paper). "
+                             "alpaca requires ALPACA_API_KEY + ALPACA_API_SECRET.")
+    parser.add_argument("--data-source", choices=["yfinance", "alpaca", "both"],
+                        default="yfinance", help="OHLCV data source (default: yfinance).")
     args = parser.parse_args()
 
     system = PredictionTradingSystem(
@@ -29,8 +41,17 @@ def main() -> int:
         initial_capital=args.capital,
         enable_ai=args.ai,
     )
+    system.cfg.data["source"] = args.data_source
+    system.data_fetcher = create_data_fetcher(
+        args.data_source, interval=system.cfg.data.get("interval", "1d")
+    )
+    if system.ai_predictor is not None:
+        system.ai_predictor._data_fetcher = system.data_fetcher
+
+    broker = AlpacaBroker(paper_trading=True) if args.broker == "alpaca" else None
     trader = system.build_auto_trader(
         tickers=args.tickers,
+        broker=broker,
         dry_run=args.dry_run,
     )
 

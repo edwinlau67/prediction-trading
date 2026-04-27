@@ -97,6 +97,36 @@ def main() -> int:
     print(f"Trades:       {stats.get('trades', 0)}")
     print(f"Win rate:     {stats.get('win_rate_pct', 0):.1f}%")
 
+    # ── AutoTrader: start ─────────────────────────────────────────────────────
+    print("\n=== POST /trading/start ===")
+    try:
+        started = _post(base, "/trading/start", {
+            "tickers": ["AAPL", "MSFT"],
+            "initial_capital": 10000.0,
+            "dry_run": True,
+        })
+        print(f"Running: {started.get('running')}")
+        print(f"Tickers: {started.get('tickers')}")
+    except Exception as exc:
+        print(f"(skipped — {exc})")
+
+    # ── AutoTrader: status ────────────────────────────────────────────────────
+    print("\n=== GET /trading/status ===")
+    try:
+        status = _get(base, "/trading/status")
+        print(f"Running:        {status.get('running')}")
+        print(f"Tickers:        {status.get('tickers')}")
+        equity = status.get("equity")
+        cash = status.get("cash")
+        if equity is not None:
+            print(f"Equity:         ${equity:,.2f}")
+        if cash is not None:
+            print(f"Cash:           ${cash:,.2f}")
+        positions = status.get("open_positions", [])
+        print(f"Open positions: {len(positions)}")
+    except Exception as exc:
+        print(f"(skipped — {exc})")
+
     return 0
 
 

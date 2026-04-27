@@ -5,19 +5,20 @@ The news/macro/sector scoring categories require external data fetched via
 fetch that data, inspect the three context objects, and run ``SignalScorer``
 directly so the enriched factors appear in the output.
 
-Requires live internet (yfinance). No API key needed.
+Requires live internet. No API key needed.
 
 Run:
     uv run python examples/08_enriched_context.py
     uv run python examples/08_enriched_context.py --ticker NVDA
     uv run python examples/08_enriched_context.py --ticker TSLA --categories trend news macro sector
+    uv run python examples/08_enriched_context.py --ticker AAPL --data-source alpaca
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.data_fetcher import create_data_fetcher
 from prediction_trading.indicators import TechnicalIndicators
 from prediction_trading.prediction import SignalScorer
 
@@ -80,12 +81,14 @@ def main() -> int:
                  "support", "fundamental", "news", "macro", "sector"),
         metavar="CAT",
     )
+    parser.add_argument("--data-source", choices=["yfinance", "alpaca", "both"],
+                        default="yfinance", help="OHLCV data source (default: yfinance).")
     args = parser.parse_args()
     ticker = args.ticker.upper()
 
     # ── Fetch with enriched=True ──────────────────────────────────────────────
     print(f"Fetching enriched data for {ticker}…")
-    fetcher = DataFetcher()
+    fetcher = create_data_fetcher(args.data_source)
     market = fetcher.fetch(ticker, include_enriched=True)
 
     _print_contexts(market)

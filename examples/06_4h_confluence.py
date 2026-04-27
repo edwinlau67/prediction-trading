@@ -3,11 +3,12 @@
 Fetches 1-hour OHLCV, resamples to 4H, and passes it to the predictor.
 When the 4H signal agrees with the daily signal, an extra point is awarded.
 
-Requires live internet (yfinance). No API key needed unless --ai is passed.
+Requires live internet. No API key needed unless --ai is passed.
 
 Run:
     uv run python examples/06_4h_confluence.py --ticker AAPL
     uv run python examples/06_4h_confluence.py --ticker NVDA --ai
+    uv run python examples/06_4h_confluence.py --ticker AAPL --data-source alpaca
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ import argparse
 import sys
 
 from prediction_trading import PredictionTradingSystem
-from prediction_trading.data_fetcher import DataFetcher
+from prediction_trading.data_fetcher import create_data_fetcher
 from prediction_trading.indicators import TechnicalIndicators
 
 _RESAMPLE_RULES = {"Open": "first", "High": "max", "Low": "min",
@@ -28,11 +29,19 @@ def main() -> int:
     parser.add_argument("--ai", action="store_true",
                         help="Enable Claude AI fusion (requires ANTHROPIC_API_KEY).")
     parser.add_argument("--timeframe", default="1w")
+    parser.add_argument("--data-source", choices=["yfinance", "alpaca", "both"],
+                        default="yfinance", help="OHLCV data source (default: yfinance).")
     args = parser.parse_args()
 
     # ── Daily prediction (baseline, no 4H) ───────────────────────────────────
     system = PredictionTradingSystem(ticker=args.ticker, enable_ai=args.ai)
     system.cfg.ai["timeframe"] = args.timeframe
+    system.cfg.data["source"] = args.data_source
+    system.data_fetcher = create_data_fetcher(
+        args.data_source, interval=system.cfg.data.get("interval", "1d")
+    )
+    if system.ai_predictor is not None:
+        system.ai_predictor._data_fetcher = system.data_fetcher
     market = system.fetch()
 
     baseline = system.predict(market)
@@ -42,7 +51,7 @@ def main() -> int:
 
     # ── Fetch and resample 1h → 4H ───────────────────────────────────────────
     print("\nFetching 1h OHLCV for 4H confluence…")
-    fetcher_1h = DataFetcher(interval="1h")
+    fetcher_1h = create_data_fetcher(args.data_source, interval="1h")
     ohlcv_1h = fetcher_1h.fetch_history(args.ticker, lookback_days=90)
     ohlcv_4h = ohlcv_1h.resample("4h").agg(_RESAMPLE_RULES).dropna()
     df_4h = TechnicalIndicators.compute_all(ohlcv_4h)

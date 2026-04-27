@@ -7,6 +7,7 @@ Run:
     uv run python examples/05_watchlist_scan.py --tickers AAPL MSFT NVDA TSLA META
     uv run python examples/05_watchlist_scan.py --min-confidence 0.4 --indicators trend momentum
     uv run python examples/05_watchlist_scan.py --workers 8 --csv scan_results.csv
+    uv run python examples/05_watchlist_scan.py --data-source alpaca
 """
 from __future__ import annotations
 
@@ -32,12 +33,15 @@ def main() -> int:
     parser.add_argument("--min-confidence", type=float, default=0.0)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--csv", metavar="FILE", help="Export results to CSV file")
+    parser.add_argument("--data-source", choices=["yfinance", "alpaca", "both"],
+                        default="yfinance", help="OHLCV data source (default: yfinance).")
     args = parser.parse_args()
 
     scanner = WatchlistScanner(
         categories=tuple(args.indicators),
         min_confidence=args.min_confidence,
         workers=args.workers,
+        data_source=args.data_source,
     )
 
     print(f"Scanning {len(args.tickers)} tickers with {args.workers} workers…")
