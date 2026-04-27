@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from ..schemas import BacktestRequest, BacktestResponse, BacktestStatsResponse
+from ..schemas import (
+    BacktestRequest, BacktestResponse, BacktestStatsResponse,
+    TradeResponse, EquityPointResponse,
+)
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 
@@ -33,6 +36,40 @@ def run_backtest(req: BacktestRequest) -> BacktestResponse:
             avg_loss=raw.get("avg_loss", 0.0),
             profit_factor=raw.get("profit_factor"),
         )
-        return BacktestResponse(stats=stats)
+        trades = [
+            TradeResponse(
+                ticker=t.ticker,
+                side=str(t.side),
+                quantity=t.quantity,
+                entry_price=t.entry_price,
+                exit_price=t.exit_price,
+                entry_time=t.entry_time.isoformat(),
+                exit_time=t.exit_time.isoformat(),
+                pnl=t.pnl,
+                return_pct=round(t.return_pct * 100, 2),
+                reason=t.reason,
+                is_win=t.is_win,
+            )
+            for t in result.portfolio.closed_trades
+        ]
+
+        equity_curve = [
+            EquityPointResponse(ts=ts.isoformat(), equity=eq)
+            for ts, eq in result.portfolio.equity_curve
+        ]
+
+        ohlcv: list[dict] = []
+        if system._market and system._market.ohlcv is not None:
+            for idx, row in system._market.ohlcv.iterrows():
+                ohlcv.append({
+                    "date": str(idx.date()),
+                    "open": float(row["Open"]),
+                    "high": float(row["High"]),
+                    "low": float(row["Low"]),
+                    "close": float(row["Close"]),
+                    "volume": float(row.get("Volume", 0)),
+                })
+
+        return BacktestResponse(stats=stats, trades=trades, equity_curve=equity_curve, ohlcv=ohlcv)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
