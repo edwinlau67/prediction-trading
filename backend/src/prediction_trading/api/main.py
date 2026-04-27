@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .routers import backtest, predict, scan, trading
+from .routers import backtest, config, portfolio, predict, scan, trading
 
 
 @asynccontextmanager
@@ -26,6 +26,8 @@ app.include_router(predict.router)
 app.include_router(scan.router)
 app.include_router(backtest.router)
 app.include_router(trading.router)
+app.include_router(portfolio.router)
+app.include_router(config.router)
 
 
 @app.get("/health")
