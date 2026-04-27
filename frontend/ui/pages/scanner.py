@@ -7,6 +7,7 @@ import io
 import pandas as pd
 import streamlit as st
 
+from ui.components import config_info_bar
 from ui.state import SCAN_RESULTS, WATCHLIST_TICKERS
 
 _ALL_CATEGORIES = ["trend", "momentum", "volatility", "volume", "support", "fundamental"]
@@ -15,6 +16,7 @@ _LABELS = {"bullish": "BUY", "bearish": "SELL", "neutral": "HOLD"}
 
 def render() -> None:
     st.markdown("## 🔍 Scanner")
+    config_info_bar()
 
     # ── Inputs ────────────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])

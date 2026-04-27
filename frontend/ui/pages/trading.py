@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui.components import equity_chart, metric_card
+from ui.components import config_info_bar, equity_chart, metric_card
 from ui.state import (
     TRADER_ERRORS,
     TRADER_INSTANCE,
@@ -22,6 +22,7 @@ from ui.state import (
 
 def render() -> None:
     st.markdown("## ⚡ Trading — AutoTrader")
+    config_info_bar()
 
     running = st.session_state.get(TRADER_RUNNING, False)
 

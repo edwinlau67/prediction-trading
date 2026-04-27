@@ -6,15 +6,16 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui.components import equity_chart, metric_card, trade_log_table
+from ui.components import config_info_bar, equity_chart, metric_card, trade_log_table
 from ui.state import TRADER_INSTANCE, TRADER_RUNNING
 
 
 def render() -> None:
+    st.markdown("## Dashboard")
+    config_info_bar()
     portfolio = _get_portfolio()
 
     if portfolio is None:
-        st.markdown("## Dashboard")
         st.info(
             "No portfolio loaded. Start the **AutoTrader** on the Trading page or run a "
             "**Backtest** to see portfolio data here."

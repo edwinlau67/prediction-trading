@@ -8,6 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from ui.components import config_info_bar
 from ui.state import ALERTS_LIST, ALERTS_TRIGGERED
 
 _ALERTS_FILE = Path("alerts.json")
@@ -42,6 +43,7 @@ def _save_alerts(active: list[dict], triggered: list[dict]) -> None:
 
 def render() -> None:
     st.markdown("## 🔔 Alerts Manager")
+    config_info_bar()
 
     active, triggered = _load_alerts()
 

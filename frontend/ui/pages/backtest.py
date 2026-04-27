@@ -6,12 +6,13 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
-from ui.components import candlestick_chart, equity_chart, metric_card
+from ui.components import candlestick_chart, config_info_bar, equity_chart, metric_card
 from ui.state import BT_OHLCV, BT_RESULT, BT_TICKER, BT_TRADES
 
 
 def render() -> None:
     st.markdown("## 📅 Backtest")
+    config_info_bar()
 
     # ── Inputs ────────────────────────────────────────────────────────────────
     col1, col2, col3 = st.columns([1, 1, 1])
