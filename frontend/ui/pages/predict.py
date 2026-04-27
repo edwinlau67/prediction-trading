@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from ui.components import candlestick_chart, prediction_card
+from ui.components import candlestick_chart, config_info_bar, prediction_card
 from ui.state import (
     PREDICT_CHART_PATH, PREDICT_DATA_FEED, PREDICT_MACRO_CONTEXT, PREDICT_OHLCV,
     PREDICT_RESULT, PREDICT_TICKER,
@@ -18,6 +18,7 @@ _ALL_CATEGORIES = ["trend", "momentum", "volatility", "volume", "support", "fund
 
 def render() -> None:
     st.markdown("## 🔮 Predict")
+    config_info_bar()
 
     # ── Inputs ────────────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
@@ -61,8 +62,8 @@ def render() -> None:
     if prediction is not None and cached_ticker == ticker:
         st.divider()
         data_feed = st.session_state.get(PREDICT_DATA_FEED, "")
-        if data_feed:
-            st.caption(f"Data source: **{data_feed}**")
+        extra = f"Feed used: **{data_feed}**" if data_feed else None
+        config_info_bar(extra=extra)
 
         tab_signal, tab_chart, tab_static = st.tabs(
             ["📊 Signal", "🕯️ Candlestick Chart", "📈 Analysis Chart"]
@@ -70,6 +71,11 @@ def render() -> None:
 
         with tab_signal:
             prediction_card(prediction)
+            ai_sig = getattr(prediction, "ai_signal", None)
+            if ai_sig is not None:
+                model = getattr(ai_sig, "model", "")
+                if model:
+                    st.caption(f"AI analysis powered by `{model}`")
             _render_timing_card(getattr(prediction, "timing", None))
             _render_index_table(st.session_state.get(PREDICT_MACRO_CONTEXT))
 
