@@ -111,9 +111,20 @@ make ui-dev    # or: uv run streamlit run frontend/app.py
 # opens http://localhost:8501
 ```
 
-Eight pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Portfolio Builder** · **Alerts** · **Settings**
+**Layout:** An 8-button **top navigation bar** selects the active page. A **🌙 Dark / ☀️ Light** toggle in the header switches the full theme. A **persistent sidebar watchlist** shows live price badges for saved tickers; clicking any ticker navigates to the Predict page. All pages except Settings show a **Config Info Bar** (data source · broker · AI model/status).
 
-Navigation uses a top bar with a light/dark theme toggle. A persistent watchlist sidebar shows live price badges and quick-links to the Predict page.
+| Page | Icon | Key Features |
+|---|---|---|
+| **Dashboard** | 📊 | Portfolio Value, Cash, Day P&L, and Open Positions KPI cards; Plotly equity curve with initial-capital baseline; Open Positions table (entry/current/stop/target); Recent Trades table (last 20); Risk tab with Max Drawdown, Win Rate, Profit Factor, daily-loss bar, and concentration chart. Auto-refreshes every 15 s while AutoTrader is running. |
+| **Predict** | 🔮 | Single-ticker prediction with timeframe and category multiselect. Signal tab: direction badge, confidence bar, Timing Recommendation card (BUY NOW / BUY ON DIP / BREAKOUT ENTRY / SELL NOW / TRAILING STOP / HOLD / WAIT), and Market Index table (VIX/SPY/QQQ/DXY with 1D/5D/30D % changes). Candlestick tab: interactive Plotly OHLC with SMA20/50, entry/stop/target lines, and volume sub-panel. Analysis tab: static matplotlib multi-panel chart. |
+| **Scanner** | 🔍 | Watchlist textarea, min-confidence and parallel-workers sliders. Returns BUY/SELL/HOLD summary cards, a ranked results table with top factors, and a CSV export button. |
+| **Backtest** | 📅 | Ticker, date range, capital, and commission inputs. Produces 8 KPI cards (return, drawdown, win rate, profit factor, trades, avg win/loss, final equity), equity curve, candlestick+trade-marker chart, and full trade log. Save Full Report writes markdown + PNGs to `results/`. |
+| **Trading** | ⚡ | Start/stop AutoTrader (daemon thread). Running view shows live equity curve, open positions, last-cycle action table, cycle error log, and a Stop button. Cycle interval 60–3600 s; Dry Run and Market Hours toggles. Auto-refreshes every 10 s. |
+| **Portfolio Builder** | 🧱 | Multi-ticker holdings cards (ETF/stock badge, category, expense ratio); Diversification Score (0–1); Correlation Matrix heatmap; Sector Exposure bar chart; recommendation list for high-correlation pairs and sector gaps. |
+| **Alerts** | 🔔 | Create Price above/below, Confidence ≥, or Daily P&L triggers. Active Alerts tab with delete buttons; Check Now evaluates against live prices. Triggered Log (last 50). State persisted to `alerts.json`. |
+| **Settings** | ⚙️ | Risk profile presets (conservative/moderate/aggressive). Full parameter controls for portfolio, risk, signals, indicator categories, AI/Claude model, AutoTrader, data source, and broker. Saves to `config/default.yaml`. |
+
+For a full per-page walkthrough see [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md).
 
 ---
 

@@ -68,7 +68,8 @@ Monorepo (uv workspace): `backend/` (core engine + FastAPI + CLI) and `frontend/
 
 ```
 CLI entry points (stock-predictor, automated-trader, scan-watchlist)
-Web UI           (frontend/app.py → frontend/ui/ — 8 pages)
+Web UI           (frontend/app.py → frontend/ui/pages/: dashboard, predict, scanner,
+                  backtest, trading, portfolio_builder, alerts, settings)
 REST API         (prediction_trading/api/ — FastAPI :8000)
         │
 prediction_trading/system.py — PredictionTradingSystem (facade)
@@ -83,6 +84,15 @@ prediction_trading/indicators/  ← TechnicalIndicators, SupportResistance
 prediction_trading/data_fetcher.py ← yfinance OHLCV + fundamentals
 frontend/ui/                    ← Streamlit pages + shared components
 ```
+
+### UI conventions
+
+- All pages call `config_info_bar()` from `ui/components.py` except Settings.
+- Theme CSS is injected once in `frontend/app.py` via `inject_theme(dark: bool)` from `ui/theme.py`.
+- Predict and Scanner multiselects show only 6 categories (trend/momentum/volatility/volume/support/fundamental); news/macro/sector are CLI-only.
+- Watchlist persists to `watchlist.json`; alerts persist to `alerts.json` — both in the working directory.
+- All session state keys are string constants defined in `ui/state.py`.
+- Slow ops (predict, backtest, scan) cache results in `st.session_state` to prevent re-running on widget interactions.
 
 ### Prediction pipeline
 

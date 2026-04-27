@@ -29,6 +29,30 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 
 ---
 
+## Web UI Pages
+
+| Page | Icon | Primary Action |
+|---|---|---|
+| Dashboard | 📊 | Portfolio KPIs, equity curve, open positions/trades, risk metrics |
+| Predict | 🔮 | Single-ticker prediction — signal card, timing rec, candlestick chart |
+| Scanner | 🔍 | Bulk watchlist scan → BUY/SELL/HOLD ranked table + CSV export |
+| Backtest | 📅 | Historical simulation → 8 KPIs, equity curve, trade log, save report |
+| Trading | ⚡ | Start/stop AutoTrader; live equity, positions, cycle report |
+| Portfolio Builder | 🧱 | Correlation heatmap, diversification score, sector exposure |
+| Alerts | 🔔 | Create price/confidence/P&L triggers; check & triggered log |
+| Settings | ⚙️ | Risk profiles, all config sliders → saves `config/default.yaml` |
+
+**Shared UI elements:**
+
+| Element | Location | Notes |
+|---|---|---|
+| Theme toggle | Header (top-right) | 🌙 Dark / ☀️ Light |
+| Config Info Bar | Below page title (all pages except Settings) | Data source · Broker · AI model or "disabled" |
+| Sidebar watchlist | Left sidebar | Click ticker → opens in Predict; persisted to `watchlist.json` |
+| `alerts.json` | Working directory | Alert state persisted across browser refreshes |
+
+---
+
 ## Indicator Categories
 
 | Category | Key Rules | Points |

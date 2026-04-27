@@ -614,6 +614,95 @@ _trader_loop(trader, interval, queue) ──► loop:
 
 The daemon thread is stopped implicitly when the main Streamlit process exits. The stop button sets `TRADER_RUNNING = False`; the loop exits on the next iteration check.
 
+### 5.4 Per-page UI specification
+
+Developer-facing widget inventory for each page. Covers session state keys, widget types and value ranges, and helper functions from `ui/components.py`.
+
+#### 5.4.1 Dashboard (`ui/pages/dashboard.py`)
+
+Session state keys read: `TRADER_INSTANCE` (live AutoTrader), `BT_RESULT` (last backtest).
+Portfolio load priority: (1) live AutoTrader from session state, (2) backtest result from session state, (3) file upload (`st.file_uploader` → parse `portfolio_state.json`).
+
+Layout:
+- `config_info_bar()` caption at top.
+- Two tabs: `tab_overview`, `tab_risk`.
+- Overview: 4-column `metric_card()` row; `equity_chart()` (Plotly, height 300); `st.dataframe` for positions (styled by Unrealised P&L sign); `trade_log_table()` for last 20 closed trades.
+- Risk: 4-column `metric_card()` row; `st.progress()` bar for daily loss vs cap; horizontal `go.Bar` chart (Plotly) for position concentration.
+- Auto-refresh: `<meta http-equiv="refresh" content="15">` injected via `st.markdown` when AutoTrader is running.
+
+#### 5.4.2 Predict (`ui/pages/predict.py`)
+
+Session state keys: `PREDICT_RESULT`, `PREDICT_TICKER`, `PREDICT_OHLCV`, `PREDICT_CHART_PATH`, `PREDICT_DATA_FEED`, `PREDICT_MACRO_CONTEXT`.
+
+Widgets:
+- `st.text_input("Ticker")` — prefilled from `PREDICT_TICKER`.
+- `st.selectbox("Timeframe")` — values: `1d 1w 1m 3m 6m ytd 1y 2y 5y`.
+- `st.multiselect("Categories")` — options: `["trend","momentum","volatility","volume","support","fundamental"]` (6 only; news/macro/sector excluded from UI).
+- `st.toggle("Enable AI")`, `st.toggle("4H Confluence")`, `st.checkbox("Save report")`.
+
+Result tabs: `tab_signal` calls `prediction_card()`, `_render_timing_card()`, `_render_index_table()`; `tab_chart` calls `candlestick_chart()` (Plotly, height 420); `tab_static` renders `st.image()` from `PREDICT_CHART_PATH`.
+
+#### 5.4.3 Scanner (`ui/pages/scanner.py`)
+
+Session state key: `SCAN_RESULTS`.
+
+Widgets:
+- `st.text_area("Watchlist")` — prefilled from `WATCHLIST_TICKERS`.
+- `st.slider("Min Confidence", 0.0, 1.0, 0.40, step=0.05)`.
+- `st.slider("Parallel Workers", 1, 16, 4)`.
+- `st.multiselect("Categories")` — same 6 options as Predict (news/macro/sector not shown).
+
+Results: 4-column summary cards; `st.columns([1,1,1,1,3,2])` grid per row; `st.download_button` with `io.BytesIO` CSV buffer.
+
+#### 5.4.4 Backtest (`ui/pages/backtest.py`)
+
+Session state keys: `BT_RESULT`, `BT_TICKER`, `BT_OHLCV`, `BT_TRADES`.
+
+Widgets: `st.text_input("Ticker")`, `st.date_input("Start/End Date")`, `st.number_input("Initial Capital")`, `st.number_input("Commission")`. Validates end > start before enabling run.
+
+Result tabs: `tab_equity` → `equity_chart()`; `tab_candle` → `candlestick_chart()` with `buy_signals`/`sell_signals` trade markers (height 500); `tab_log` → `st.dataframe` (scrollable, max-height 500px). Save button calls `system.save_report(result=result)`.
+
+#### 5.4.5 Trading (`ui/pages/trading.py`)
+
+Session state keys: `TRADER_RUNNING`, `TRADER_INSTANCE`, `TRADER_THREAD`, `TRADER_QUEUE`, `TRADER_REPORTS`, `TRADER_ERRORS`.
+
+Stopped state widgets (inside `st.form("trader_config")`): tickers textarea, `st.number_input("Cycle Interval", 60, 3600, 300, step=60)`, dry-run checkbox, market-hours checkbox, state-path text input.
+
+Running state widgets: status `metric_card()`; stop button (`st.button` outside form); 3 KPI `metric_card()` calls; `equity_chart()`; positions dataframe; last-cycle expander with actions dataframe and errors expander. Auto-rerun: `time.sleep(10); st.rerun()` after draining queue.
+
+#### 5.4.6 Portfolio Builder (`ui/pages/portfolio_builder.py`)
+
+Widgets: `st.text_area("Tickers")`, `st.slider("Lookback Days", 30, 1260, 252)`.
+
+Output components: holdings cards in groups of 4 (`st.columns(4)`) with ETF/Stock badge based on `ETFAnalyzer.is_etf()`; diversification score displayed as `st.metric` with color via `st.markdown`; correlation heatmap as `go.Heatmap` with custom colorscale; sector exposure as `go.Bar`; recommendations as `st.warning` (high correlation/expense) or `st.info` (other).
+
+#### 5.4.7 Alerts (`ui/pages/alerts.py`)
+
+Session state keys: `ALERTS_LIST`, `ALERTS_TRIGGERED`. Persisted to `alerts.json` via `_load_alerts()` / `_save_alerts()`.
+
+Three tabs: `tab_active`, `tab_create`, `tab_log`.
+- Active: iterates `ALERTS_LIST`; per-alert `st.columns([5,1])` with info col and delete button keyed by index. "Check Now" calls `_check_alerts()` → `yfinance.Ticker(t).fast_info.last_price`.
+- Create: ticker `st.text_input`, trigger-type `st.selectbox` (5 options), value `st.number_input`, create button.
+- Log: reversed slice of last 50 triggered entries as `st.dataframe`; "Clear Log" button resets `ALERTS_TRIGGERED`.
+
+HTML escaping applied to all user-supplied ticker inputs before rendering.
+
+#### 5.4.8 Settings (`ui/pages/settings.py`)
+
+Session state keys: `ACTIVE_PROFILE`, `SETTINGS_DIRTY`.
+
+Sections and widgets:
+- Risk profile: `st.selectbox` (conservative/moderate/aggressive) + Apply button → merges preset into form state.
+- Portfolio: 2-column layout with `st.number_input` for capital/commission and `st.slider` for position count and max size %.
+- Risk: 2-column sliders for max daily loss, min R:R, stop ATR mult, take-profit ATR mult.
+- Signals: sliders for min confidence, 4H bonus points, AI weight.
+- Indicator categories: `st.multiselect` — all 9 categories (including news/macro/sector, unlike Predict/Scanner pages).
+- AI: toggle, `st.selectbox` for model (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5-20251001`), timeframe selectbox, max-tokens number input.
+- AutoTrader: interval number input, dry-run/market-hours toggles, slippage slider.
+- Data source: `st.radio` (yfinance/alpaca/both); alpaca info box shown when alpaca/both selected.
+- Broker: `st.radio` (paper/alpaca); Alpaca paper mode toggle disabled when broker != alpaca.
+- Save button: `yaml.dump(config)` to `config/default.yaml`. Success toast notes that AutoTrader restart is required.
+
 ---
 
 ## 6. Reporting and Output
