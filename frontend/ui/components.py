@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import yaml
 
 try:
     from prediction_trading.prediction.predictor import Prediction
@@ -19,6 +21,38 @@ _LABELS = {
     "bearish": "SELL",
     "neutral": "HOLD",
 }
+
+_CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "default.yaml"
+
+
+def _load_config() -> dict:
+    try:
+        with open(_CONFIG_PATH) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def config_info_bar(*, extra: str | None = None) -> None:
+    """Render a one-line config summary bar (data source, broker, AI model)."""
+    cfg = _load_config()
+    data_src = cfg.get("data", {}).get("source", "yfinance")
+    broker = cfg.get("broker", {}).get("type", "paper")
+    ai_cfg = cfg.get("ai", {})
+    ai_enabled = ai_cfg.get("enabled", False)
+    model = ai_cfg.get("model", "—") if ai_enabled else "disabled"
+    ai_weight = cfg.get("signals", {}).get("ai_weight", 0.5) if ai_enabled else None
+
+    parts = [
+        f"Data: **{data_src}**",
+        f"Broker: **{broker}**",
+        f"AI: **{model}**",
+    ]
+    if ai_weight is not None:
+        parts.append(f"AI weight: **{ai_weight}**")
+    if extra:
+        parts.append(extra)
+    st.caption("  ·  ".join(parts))
 
 
 def _get_colors() -> dict[str, str]:
