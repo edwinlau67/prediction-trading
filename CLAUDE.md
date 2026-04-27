@@ -44,6 +44,12 @@ uv run scan-watchlist AAPL TSLA NVDA
 # Enriched context (news/macro/sector, no API key needed)
 uv run python examples/08_enriched_context.py --ticker AAPL
 
+# Timing recommendation (entry/stop/target levels, R:R ratio)
+uv run python examples/09_timing_recommendation.py --ticker AAPL
+
+# ETF metadata and portfolio correlation analysis
+uv run python examples/10_etf_portfolio.py --tickers SPY QQQ XLK BND GLD
+
 # Run all tests (offline — no API key required)
 make test             # uv run pytest backend/tests/ -v
 
@@ -92,7 +98,7 @@ Passing `--indicators trend momentum` (or setting `indicators.categories` in `co
 
 `RiskManager` gates every signal: `min_confidence` (0.40), max positions (5), max position size (5% equity), daily loss cap (2%), min R:R (1.5). Stops and take-profits are ATR-multiples (2× and 3× by default). All defaults live in `config/default.yaml` and can be overridden via `PredictionTradingSystem` kwargs.
 
-`AutoTrader` runs a cycle loop: refresh data → close expired positions → score signal → risk-check → place order via `BaseBroker`. `PaperBroker` is the default; real brokers implement `get_quote / place_order / close_position`. State persists to `portfolio_state.json` via `StateStore`.
+`AutoTrader` runs a cycle loop: refresh data → close expired positions → score signal → risk-check → place order via `BaseBroker`. `PaperBroker` is the default; `AlpacaBroker` is available for live/paper Alpaca accounts (requires `ALPACA_API_KEY` + `ALPACA_API_SECRET`). State persists to `portfolio_state.json` via `StateStore`.
 
 ### Output structure
 

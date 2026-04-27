@@ -1,12 +1,17 @@
 # Examples
 
-Eight annotated end-to-end examples. All run offline except where AI or live market data is noted.
+Ten annotated end-to-end examples. All run offline except where AI or live market data is noted.
 
 ---
 
 ## 1. Single-Ticker Prediction (Rule-Based)
 
 Predict AAPL using technical indicators only. No API key needed.
+
+```bash
+uv run python examples/01_predict.py --ticker AAPL
+ANTHROPIC_API_KEY=... uv run python examples/01_predict.py --ticker AAPL --ai
+```
 
 ```python
 from prediction_trading import PredictionTradingSystem
@@ -57,6 +62,12 @@ Price target: 213.00
 Uses Claude for narrative analysis and the new 4H timeframe confluence signal.
 
 **Requires:** `ANTHROPIC_API_KEY` in `.env` and live internet access.
+
+```bash
+uv run python examples/06_4h_confluence.py --ticker AAPL
+uv run python examples/06_4h_confluence.py --ticker NVDA --ai
+uv run python examples/06_4h_confluence.py --ticker TSLA --timeframe 1m --ai
+```
 
 ```python
 from prediction_trading import PredictionTradingSystem
@@ -115,6 +126,12 @@ system.save_report(prediction=prediction)
 
 Backtest TSLA over 2 years and analyse the results.
 
+```bash
+uv run python examples/02_backtest.py --ticker AAPL
+uv run python examples/02_backtest.py --ticker TSLA --start 2022-01-01 --end 2024-01-01 --capital 25000
+uv run python examples/02_backtest.py --ticker NVDA --ai
+```
+
 ```python
 from prediction_trading import PredictionTradingSystem
 
@@ -158,6 +175,13 @@ print(f"\nReport: {out_dir}")
 ## 4. Watchlist Scan with CSV Export
 
 Screen a 20-ticker watchlist in parallel and export the results.
+
+```bash
+uv run python examples/05_watchlist_scan.py
+uv run python examples/05_watchlist_scan.py --tickers AAPL MSFT NVDA TSLA META
+uv run python examples/05_watchlist_scan.py --min-confidence 0.4 --indicators trend momentum
+uv run python examples/05_watchlist_scan.py --workers 8 --csv scan_results.csv
+```
 
 ```python
 import csv
@@ -214,6 +238,13 @@ print("\nExported: scan_results.csv")
 
 Run two cycles of paper trading, persist state, then restore and inspect.
 
+```bash
+uv run python examples/04_automated_trading.py --tickers AAPL TSLA
+uv run python examples/04_automated_trading.py --tickers AAPL MSFT NVDA --dry-run
+uv run python examples/04_automated_trading.py --tickers AAPL --broker alpaca
+# Alpaca requires: ALPACA_API_KEY and ALPACA_API_SECRET in environment
+```
+
 ```python
 from pathlib import Path
 from prediction_trading import PredictionTradingSystem
@@ -266,7 +297,9 @@ print(f"After cycle 2 — Equity: ${trader2.portfolio.equity({}):.2f}")
 
 ---
 
-## Using Custom Indicator Categories
+## 6. Custom Indicator Categories
+
+Filter scoring to specific categories using the Python API directly. No standalone script — run inline.
 
 ```python
 from prediction_trading.prediction.signal_scorer import SignalScorer
@@ -298,6 +331,12 @@ print(f"Bearish factors: {[f.name for f in signal.bearish_factors]}")
 Fetch and inspect the three enriched context objects, then score with the `news`, `macro`, and `sector` categories enabled.
 
 **Requires:** live internet (yfinance). No API key needed.
+
+```bash
+uv run python examples/08_enriched_context.py
+uv run python examples/08_enriched_context.py --ticker NVDA
+uv run python examples/08_enriched_context.py --ticker TSLA --categories trend news macro sector
+```
 
 ```python
 from prediction_trading.data_fetcher import DataFetcher
@@ -344,16 +383,19 @@ for f in signal.factors:
     print(f"  [{marker}] [{f.category:<11}] {f.name:<35} {f.signed:+d} pts")
 ```
 
-Run directly: `uv run python examples/08_enriched_context.py --ticker NVDA`
-
 ---
 
 ## 8. REST API Client
 
-Call the FastAPI server programmatically. Start the server first:
+Call the FastAPI server programmatically. Start the server first, then run the client:
 
 ```bash
+# Terminal 1 — start the server
 uv run uvicorn prediction_trading.api.main:app --reload
+
+# Terminal 2 — run the client
+uv run python examples/07_rest_api.py
+uv run python examples/07_rest_api.py --base-url http://localhost:8000
 ```
 
 ```python
@@ -388,4 +430,94 @@ for r in scan["results"]:
 bt = post("/backtest/", {"ticker": "AAPL", "start": "2023-01-01", "end": "2024-01-01"})
 stats = bt["stats"]
 print(f"Return: {stats['return_pct']:+.2f}%  Trades: {stats['trades']}")
+
+# Start AutoTrader session (dry run)
+started = post("/trading/start", {"tickers": ["AAPL", "MSFT"], "initial_capital": 10000.0, "dry_run": True})
+print(f"Running: {started['running']}  Tickers: {started['tickers']}")
+
+# AutoTrader status
+import urllib.request as _ur
+with _ur.urlopen(f"{BASE}/trading/status") as r:
+    status = json.loads(r.read())
+print(f"Equity: ${status.get('equity', 0):,.2f}  Open positions: {len(status.get('open_positions', []))}")
 ```
+
+---
+
+## 9. Timing Recommendation
+
+Get an actionable entry/exit signal with price levels and R:R ratio. No API key needed.
+
+```bash
+uv run python examples/09_timing_recommendation.py --ticker AAPL
+uv run python examples/09_timing_recommendation.py --ticker NVDA --timeframe 1m
+ANTHROPIC_API_KEY=... uv run python examples/09_timing_recommendation.py --ticker AAPL --ai
+```
+
+```python
+from prediction_trading import PredictionTradingSystem
+
+system = PredictionTradingSystem("AAPL")
+market = system.fetch()
+prediction = system.predict(market)
+
+t = prediction.timing
+if t:
+    print(f"Action:      {t.action}")
+    print(f"Reason:      {t.reason}")
+    print(f"Horizon:     {t.time_horizon}")
+    if t.entry_price:
+        print(f"Entry:       ${t.entry_price:,.2f}")
+    if t.stop_loss:
+        print(f"Stop loss:   ${t.stop_loss:,.2f}")
+    if t.take_profit:
+        print(f"Take profit: ${t.take_profit:,.2f}")
+    if t.entry_price and t.stop_loss and t.take_profit:
+        risk = abs(t.entry_price - t.stop_loss)
+        reward = abs(t.take_profit - t.entry_price)
+        if risk > 0:
+            print(f"R:R ratio:   {reward / risk:.2f}")
+```
+
+Seven possible `TimingAction` values:
+
+| Action | Meaning |
+|--------|---------|
+| `BUY_NOW` | Strong bullish — enter at market price |
+| `BUY_ON_DIP` | Bullish but overextended — wait for SMA50 pullback |
+| `BUY_ON_BREAKOUT` | Near resistance — buy on confirmed breakout |
+| `SELL_NOW` | Strong bearish — exit at market price |
+| `SELL_TRAILING` | Near price target — protect gains with trailing stop |
+| `HOLD` | Directional bias present but confidence too low |
+| `WAIT` | No clear signal — stay in cash |
+
+---
+
+## 10. ETF Portfolio Analysis
+
+Lookup ETF metadata and analyse portfolio-level correlation, diversification, and sector exposure. No API key needed.
+
+```bash
+uv run python examples/10_etf_portfolio.py
+uv run python examples/10_etf_portfolio.py --tickers SPY QQQ XLK BND GLD TLT VEA
+uv run python examples/10_etf_portfolio.py --lookback 90
+```
+
+```python
+from prediction_trading.etf import ETFAnalyzer
+
+analyzer = ETFAnalyzer()
+
+# Per-ticker metadata (uses built-in catalogue — no network needed for common ETFs)
+info = analyzer.get_etf_info("SPY")
+print(f"{info.ticker}: {info.name} | {info.category} | ER: {info.expense_ratio}%")
+
+# Portfolio analysis — fetches price history via yfinance
+analysis = analyzer.analyze_portfolio(["SPY", "QQQ", "XLK", "BND", "GLD"])
+print(f"Diversification score: {analysis.diversification_score:.2f}")
+print("Sector exposure:", analysis.sector_exposure)
+for rec in analysis.recommendations:
+    print(f"  • {rec}")
+```
+
+Built-in catalogue covers 30+ ETFs (broad market, SPDR sectors, bonds, gold, silver, international). Unknown tickers fall back to yfinance.

@@ -32,11 +32,14 @@
 
 - **AI-powered predictions** via Claude tool-use with prompt caching
 - **Nine indicator categories**: trend, momentum, volatility, volume, support, fundamental, news, macro, sector
+- **Timing recommendations**: actionable entry/stop/target levels with R:R ratio (`TimingRecommendation`)
+- **ETF analyzer**: built-in catalogue for 30+ ETFs, portfolio correlation, diversification score, sector exposure
 - **Bar-by-bar backtester** with full performance reports and four chart panels
 - **Paper trading engine** with ATR-based risk management and portfolio persistence
+- **Alpaca broker integration** for live/paper trading via `AlpacaBroker`
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
 - **FastAPI REST API** with OpenAPI docs at `/docs`
-- **Streamlit web UI** with seven pages, live price badges, and light/dark theme
+- **Streamlit web UI** with seven pages, live price badges, config info bar, and light/dark theme
 
 ---
 
@@ -125,10 +128,11 @@ Endpoints mirror the Python API:
 
 | Method | Path | Action |
 |--------|------|--------|
-| `POST` | `/predict` | Run prediction for one ticker |
-| `POST` | `/scan` | Scan a watchlist of tickers |
-| `POST` | `/backtest` | Run a backtest over a date range |
-| `POST` | `/trading/cycle` | Execute one AutoTrader cycle |
+| `POST` | `/predict/` | Run prediction for one ticker |
+| `POST` | `/scan/` | Scan a watchlist of tickers |
+| `POST` | `/backtest/` | Run a backtest over a date range |
+| `POST` | `/trading/start` | Initialise an AutoTrader session |
+| `GET`  | `/trading/status` | Current AutoTrader state (equity, positions) |
 
 See `docs/API_REFERENCE.md` or `/docs` for full schema details.
 

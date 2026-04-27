@@ -203,6 +203,7 @@ class Prediction:
     ai_signal: AIPrediction | None
     factors: list[Factor]
     meta: dict
+    timing: TimingRecommendation | None   # entry/stop/target levels; None when confidence < 0.4
 
 class UnifiedPredictor:
     def __init__(
@@ -603,6 +604,74 @@ class StateStore:
 
 ---
 
+## `TimingRecommendation` — `prediction_trading/prediction/timing.py`
+
+Rule-based, stateless entry/exit recommendation attached to every `Prediction`.
+
+```python
+TimingAction = Literal[
+    "BUY_NOW", "BUY_ON_DIP", "BUY_ON_BREAKOUT",
+    "SELL_NOW", "SELL_TRAILING", "HOLD", "WAIT",
+]
+
+@dataclass
+class TimingRecommendation:
+    action: TimingAction
+    reason: str
+    entry_price: float | None    # market entry or breakout trigger
+    stop_loss: float | None      # ATR × 2 below/above entry
+    take_profit: float | None    # price_target or ATR × 3
+    time_horizon: str            # mirrors prediction timeframe (e.g. "1w")
+
+def compute_timing(
+    scored_signal: ScoredSignal,
+    ohlcv: pd.DataFrame,
+    prediction: Prediction,
+) -> TimingRecommendation
+    # Called automatically inside UnifiedPredictor.predict() — rarely needed directly.
+```
+
+---
+
+## `ETFAnalyzer` — `prediction_trading/etf.py`
+
+Built-in catalogue for 30+ ETFs; falls back to yfinance for unlisted tickers.
+
+```python
+@dataclass
+class ETFInfo:
+    ticker: str
+    name: str
+    category: str          # e.g. "US Large Blend", "Sector — Technology"
+    tracked_index: str     # e.g. "S&P 500", "NASDAQ-100"
+    expense_ratio: float | None
+    is_etf: bool
+
+@dataclass
+class PortfolioAnalysis:
+    tickers: list[str]
+    correlation_matrix: pd.DataFrame   # pairwise daily-return correlation
+    diversification_score: float       # 0–1; 1 = perfectly uncorrelated
+    sector_exposure: dict[str, float]  # sector → equal-weight fraction
+    recommendations: list[str]
+    etf_infos: list[ETFInfo]
+
+class ETFAnalyzer:
+    def get_etf_info(self, ticker: str) -> ETFInfo
+        # Catalogue lookup first; yfinance fallback for unknown tickers.
+
+    def is_etf(self, ticker: str) -> bool
+
+    def analyze_portfolio(
+        self,
+        tickers: list[str],
+        lookback_days: int = 252,
+    ) -> PortfolioAnalysis
+        # Fetches price history via yfinance, computes correlation + sector exposure.
+```
+
+---
+
 ## `BaseBroker` — `prediction_trading/trading/broker.py`
 
 Implement these three methods to integrate a live broker:
@@ -623,6 +692,14 @@ class BaseBroker(ABC):
         quote: float | None = None,
         when: datetime | None = None,
     ) -> Trade | None
+
+# Built-in implementations:
+class PaperBroker(BaseBroker): ...   # default; simulated fills, no external deps
+
+class AlpacaBroker(BaseBroker):
+    def __init__(self, paper_trading: bool = True) -> None
+    # Reads ALPACA_API_KEY + ALPACA_API_SECRET from environment.
+    # Requires: uv pip install alpaca-py
 ```
 
 ---
