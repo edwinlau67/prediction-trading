@@ -46,6 +46,7 @@ class AIPrediction:
     fundamentals: dict[str, Any] = field(default_factory=dict)
     narrative: str = ""
     raw_tool_output: dict[str, Any] = field(default_factory=dict)
+    model: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -60,6 +61,7 @@ class AIPrediction:
             "key_factors": self.key_factors,
             "fundamentals": self.fundamentals,
             "narrative": self.narrative,
+            "model": self.model,
         }
 
 
@@ -159,6 +161,7 @@ class AIPredictor:
             fundamentals=tool_output.get("fundamentals", {}),
             narrative=narrative,
             raw_tool_output=tool_output,
+            model=self.model,
         )
 
     # ---------------------------------------------------------------- tool
