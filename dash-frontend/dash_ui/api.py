@@ -20,6 +20,12 @@ def _post(path: str, payload: dict, timeout: int = _SHORT) -> dict:
     return r.json()
 
 
+def _put(path: str, payload: dict, timeout: int = _SHORT) -> dict:
+    r = requests.put(f"{API_BASE}{path}", json=payload, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+
 def health_check() -> dict:
     return _get("/health")
 
@@ -93,6 +99,8 @@ def trading_start(
     initial_capital: float = 10_000.0,
     dry_run: bool = True,
     enforce_market_hours: bool = False,
+    interval_seconds: int = 300,
+    state_path: str | None = None,
 ) -> dict:
     return _post(
         "/trading/start",
@@ -101,5 +109,27 @@ def trading_start(
             "initial_capital": initial_capital,
             "dry_run": dry_run,
             "enforce_market_hours": enforce_market_hours,
+            "interval_seconds": interval_seconds,
+            "state_path": state_path,
         },
     )
+
+
+def predict_macro() -> dict:
+    return _get("/predict/macro", timeout=_LONG)
+
+
+def portfolio_analyze(tickers: list[str], lookback_days: int = 252) -> dict:
+    return _post(
+        "/portfolio/analyze",
+        {"tickers": [t.upper() for t in tickers], "lookback_days": lookback_days},
+        timeout=_LONG,
+    )
+
+
+def get_config() -> dict:
+    return _get("/config/")
+
+
+def put_config(cfg: dict) -> dict:
+    return _put("/config/", cfg)
