@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from ..schemas import ScanRequest, ScanResponse, ScanResultResponse
+from ..schemas import FactorResponse, ScanRequest, ScanResponse, ScanResultResponse
 
 router = APIRouter(prefix="/scan", tags=["scanner"])
 
@@ -26,6 +26,16 @@ def scan(req: ScanRequest) -> ScanResponse:
                     direction=r.direction,
                     confidence=r.confidence,
                     top_factors=r.top_factors or [],
+                    factors=[
+                        FactorResponse(
+                            category=str(f.category),
+                            name=f.name,
+                            direction=str(f.direction),
+                            points=f.points,
+                            detail=f.detail,
+                        )
+                        for f in (r.factors or [])
+                    ],
                     current_price=r.current_price or 0.0,
                     error=r.error,
                 )

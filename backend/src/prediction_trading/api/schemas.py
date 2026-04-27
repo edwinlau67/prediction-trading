@@ -68,6 +68,7 @@ class ScanResultResponse(BaseModel):
     direction: str
     confidence: float
     top_factors: list[str] = Field(default_factory=list)
+    factors: list[FactorResponse] = Field(default_factory=list)
     current_price: float = 0.0
     error: str | None = None
 

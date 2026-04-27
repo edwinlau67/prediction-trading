@@ -20,6 +20,7 @@ class ScanResult:
     direction: str          # "bullish" | "bearish" | "neutral"
     confidence: float
     top_factors: list[str] = field(default_factory=list)
+    factors: list = field(default_factory=list)  # list[Factor] — full factor objects for analytics
     current_price: float = 0.0
     error: str | None = None
 
@@ -69,6 +70,7 @@ class WatchlistScanner:
                 direction=score.direction,
                 confidence=round(score.confidence, 3),
                 top_factors=[f.label for f in top],
+                factors=score.factors,
                 current_price=round(market.current_price, 4),
             )
         except Exception as exc:
