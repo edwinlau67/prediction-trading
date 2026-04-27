@@ -1,4 +1,4 @@
-.PHONY: install sync lint fmt type-check test test-cov api-dev ui-dev pre-commit-install clean
+.PHONY: install sync lint fmt type-check test test-cov api-dev ui-dev dash-dev pre-commit-install clean
 
 install:
 	uv sync --all-packages
@@ -27,6 +27,9 @@ api-dev:
 
 ui-dev:
 	uv run streamlit run frontend/app.py
+
+dash-dev:
+	uv run python dash-frontend/app.py
 
 pre-commit-install:
 	uv run pre-commit install
