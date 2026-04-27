@@ -571,7 +571,7 @@ Errors in individual tickers are caught and returned as `ScanResult(error=str(ex
 
 Entry point: `frontend/app.py` — launched via `make ui-dev` (`streamlit run frontend/app.py`, default port 8501). `frontend/` is a separate uv workspace package (`prediction-trading-frontend`) that lists `prediction-trading-backend` as a dependency.
 
-Seven pages via a **top navigation bar** (sidebar nav was replaced). A light/dark theme toggle lives in the header. A **persistent watchlist sidebar** (`ui/watchlist.py`) shows live price badges and quick-links into the Predict page; it is rendered on every page via `render_sidebar()`.
+Eight pages via a **top navigation bar** (sidebar nav was replaced). A light/dark theme toggle lives in the header. A **persistent watchlist sidebar** (`ui/watchlist.py`) shows live price badges and quick-links into the Predict page; it is rendered on every page via `render_sidebar()`.
 
 Additional UI modules:
 - `ui/theme.py` — CSS injection for light/dark themes via `inject_theme(dark: bool)`.
@@ -584,9 +584,10 @@ Additional UI modules:
 |---|---|---|
 | Dashboard | `ui/pages/dashboard.py` | Portfolio KPIs, Plotly equity curve, open positions, recent trades. Auto-refresh every 15 s when AutoTrader is running. |
 | Predict | `ui/pages/predict.py` | Ticker + timeframe + category multiselect + AI toggle + 4H toggle + save-report checkbox. Calls `system.predict(market, hourly_4h=df_4h)`. Results cached in session state. |
-| Scanner | `ui/pages/scanner.py` | Watchlist textarea, min-confidence slider, workers slider, category multiselect (default: all six). CSV export. |
+| Scanner | `ui/pages/scanner.py` | Watchlist textarea, min-confidence slider, workers slider, category multiselect (default: all nine). CSV export. |
 | Backtest | `ui/pages/backtest.py` | Date pickers, capital/commission inputs. Calls `system.backtest()`. Equity curve + trade log. Save full report button. |
 | Trading | `ui/pages/trading.py` | Start/stop AutoTrader (daemon thread + `queue.Queue`). Live cycle reports, positions monitor, error log. 10 s auto-rerun. |
+| Portfolio Builder | `ui/pages/portfolio_builder.py` | ETF metadata lookup, correlation heatmap, sector exposure breakdown, and diversification recommendations. Uses `ETFAnalyzer`. |
 | Alerts | `ui/pages/alerts.py` | Price/confidence/P&L trigger management. Triggers: price above/below, confidence ≥, daily P&L ≥/≤. Alert state persisted to `alerts.json`. |
 | Settings | `ui/pages/settings.py` | Risk profile selector (conservative/moderate/aggressive). Sliders for all `default.yaml` sections including indicator categories. Saves on button click. |
 
@@ -747,8 +748,11 @@ All tests run offline — no network, no API key required.
 | `test_data_fetcher.py` | 7 | OHLCV shape, DatetimeIndex tz-stripping, fundamentals best-effort, interval parameter, fetch_history date range |
 | `test_reporting.py` | 8 | Prediction chart panel selection (always-present + category-conditional), report writer output structure, backtest chart builder |
 | `test_unified_predictor.py` | 6 | AI/rule fusion formula, ai_weight=0 fallback, actionable flag, neutral deadband, min_confidence gate |
+| `test_alpaca_broker.py` | 9 | AlpacaBroker: market/limit orders, quote fallback (IEX → latest bar → yfinance), error swallowing on close, fill propagation |
+| `test_alpaca_data_fetcher.py` | 13 | AlpacaDataFetcher: OHLCV fetch, invalid-bar filtering, feed-label propagation; _MergedDataFetcher yfinance fallback; create_data_fetcher factory dispatch |
+| `test_etf_analyzer.py` | 15 | ETFAnalyzer: catalogue lookup (case-insensitive), is_etf, unknown-ticker yfinance fallback, correlation matrix shape + diagonal, sector exposure, diversification score, high-correlation recommendations |
 
-**Total: 78 tests.**
+**Total: 115 tests.**
 
 ---
 
