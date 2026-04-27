@@ -29,7 +29,7 @@ cp .env.example .env
 
 Verify:
 ```bash
-uv run pytest backend/tests/ -v   # 11 test files, all offline — no API key needed
+uv run pytest backend/tests/ -v   # 14 test files, all offline — no API key needed
 uv run stock-predictor --tickers AAPL --no-ai
 ```
 
@@ -41,7 +41,7 @@ uv run stock-predictor --tickers AAPL --no-ai
 uv run streamlit run frontend/app.py
 ```
 
-Opens at `http://localhost:8501`. Seven pages via a top navigation bar (with a light/dark theme toggle in the header). A persistent watchlist sidebar shows live price badges on every page.
+Opens at `http://localhost:8501`. Eight pages via a top navigation bar (with a light/dark theme toggle in the header). A persistent watchlist sidebar shows live price badges on every page.
 
 | Page | What it does |
 |---|---|
@@ -50,6 +50,7 @@ Opens at `http://localhost:8501`. Seven pages via a top navigation bar (with a l
 | **Scanner** | Parallel watchlist scan with BUY/SELL/HOLD table and CSV export |
 | **Backtest** | Historical simulation with equity curve, metrics, and trade log |
 | **Trading** | Start/stop AutoTrader, monitor live portfolio and cycle reports |
+| **Portfolio Builder** | Multi-ticker correlation analysis, sector exposure, and diversification score |
 | **Alerts** | Manage price/confidence/P&L triggers; alert state persisted to `alerts.json` |
 | **Settings** | Apply risk profiles, tune all parameters, save to `config/default.yaml` |
 
@@ -356,7 +357,7 @@ Enable in config:
 ```yaml
 ai:
   enabled: true
-  model: claude-opus-4-7
+  model: claude-sonnet-4-6
   timeframe: 1m
   max_tokens: 2000
 ```

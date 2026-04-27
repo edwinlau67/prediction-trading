@@ -68,7 +68,7 @@ Monorepo (uv workspace): `backend/` (core engine + FastAPI + CLI) and `frontend/
 
 ```
 CLI entry points (stock-predictor, automated-trader, scan-watchlist)
-Web UI           (frontend/app.py → frontend/ui/ — 7 pages)
+Web UI           (frontend/app.py → frontend/ui/ — 8 pages)
 REST API         (prediction_trading/api/ — FastAPI :8000)
         │
 prediction_trading/system.py — PredictionTradingSystem (facade)

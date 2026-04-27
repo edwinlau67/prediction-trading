@@ -84,11 +84,11 @@ signals:
 
 ai:
   enabled: true                  # set ANTHROPIC_API_KEY to use Claude
-  model: claude-opus-4-7
+  model: claude-sonnet-4-6
   timeframe: 1m
 
 data:
-  source: both                   # "yfinance" | "alpaca" | "both" (default: both)
+  source: yfinance               # "yfinance" | "alpaca" | "both" (default: yfinance)
 ```
 
 ---
@@ -173,7 +173,7 @@ results/
 | Variable | Required | Description |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Only for AI | `sk-ant-...` |
-| `CLAUDE_MODEL` | No | Override model (default: `claude-opus-4-7`) |
+| `CLAUDE_MODEL` | No | Override model (default: `claude-sonnet-4-6`) |
 | `ALPACA_API_KEY` | Only for Alpaca | Alpaca brokerage key |
 | `ALPACA_API_SECRET` | Only for Alpaca | Alpaca brokerage secret |
 

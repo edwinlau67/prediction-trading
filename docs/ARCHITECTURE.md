@@ -100,7 +100,7 @@ The top-level façade. Reads `config/default.yaml`, instantiates all sub-compone
 Point-based rule engine. Nine indicator categories emit `Factor` objects (±1 to ±2 points each). Net points → direction + confidence (`min(1.0, |net| / confidence_scale)`). Multi-timeframe bonuses applied for weekly and 4H agreement. The `news`, `macro`, and `sector` categories are activated when the corresponding context objects (`NewsContext`, `MacroContext`, `SectorContext`) are passed to `score()`.
 
 ### `prediction_trading/prediction/ai_predictor.py — AIPredictor`
-Claude tool-use loop. The model calls `stock_prediction` tool → local execution runs `DataFetcher.fetch(include_enriched=True)` and `SignalScorer` (with news/macro/sector contexts) → tool result includes optional `news`, `macro`, `sector` dicts → second API call returns a narrative (≤500 words). System prompt uses `cache_control: ephemeral` for prompt caching (~10% cost on cache hits).
+Claude tool-use loop. The model calls `stock_prediction` tool → local execution runs `DataFetcher.fetch(include_enriched=True)` and `SignalScorer` (with news/macro/sector contexts) → tool result includes optional `news`, `macro`, `sector` dicts → second API call returns a narrative (≤500 words). System prompt uses `cache_control: ephemeral` for prompt caching (~90% cost reduction on cache hits).
 
 ### `prediction_trading/prediction/predictor.py — UnifiedPredictor`
 Fuses rule and AI signals: `blended = (1 - ai_weight) × rule_signed + ai_weight × ai_signed`. Falls back to rule-only when AI is disabled or unavailable.

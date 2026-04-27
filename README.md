@@ -39,7 +39,7 @@
 - **Alpaca broker integration** for live/paper trading via `AlpacaBroker`
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
 - **FastAPI REST API** with OpenAPI docs at `/docs`
-- **Streamlit web UI** with seven pages, live price badges, config info bar, and light/dark theme
+- **Streamlit web UI** with eight pages, live price badges, config info bar, and light/dark theme
 
 ---
 
@@ -90,7 +90,7 @@ prediction-trading/
 │   │   ├── data_fetcher.py
 │   │   ├── scanner.py
 │   │   └── system.py             # PredictionTradingSystem (primary facade)
-│   └── tests/                    # 78 tests, no network or API key required
+│   └── tests/                    # 115 tests across 14 files, no network or API key required
 ├── frontend/
 │   ├── app.py                    # Streamlit entry point
 │   └── ui/                       # pages, components, theme, watchlist
@@ -111,7 +111,7 @@ make ui-dev    # or: uv run streamlit run frontend/app.py
 # opens http://localhost:8501
 ```
 
-Seven pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Alerts** · **Settings**
+Eight pages: **Dashboard** · **Predict** · **Scanner** · **Backtest** · **Trading** · **Portfolio Builder** · **Alerts** · **Settings**
 
 Navigation uses a top bar with a light/dark theme toggle. A persistent watchlist sidebar shows live price badges and quick-links to the Predict page.
 
@@ -166,7 +166,7 @@ uv run stock-predictor --tickers AAPL --model claude-opus-4-7
 ```
 --tickers           One or more ticker symbols (default: AAPL TSLA INTC)
 --timeframe         1d | 1w | 1m | 3m | 6m | ytd | 1y | 2y | 5y (default: 1w)
---model             Claude model ID (default: claude-opus-4-7)
+--model             Claude model ID (default: claude-sonnet-4-6)
 --indicators        trend | momentum | volatility | volume | support | fundamental | news | macro | sector
 --no-ai             Rule-based only; skip the Claude call
 --4h                Enable 4H confluence bonus (resamples 1h OHLCV to 4H)
@@ -411,7 +411,7 @@ make test          # uv run pytest backend/tests/ -v
 make test-cov      # with coverage report
 ```
 
-All 78 tests across 11 files use synthetic OHLCV fixtures (`backend/tests/conftest.py`) — no network or API key required.
+All 115 tests across 14 files use synthetic OHLCV fixtures (`backend/tests/conftest.py`) — no network or API key required.
 
 ---
 

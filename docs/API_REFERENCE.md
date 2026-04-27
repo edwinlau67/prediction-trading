@@ -174,7 +174,7 @@ class AIPredictor:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-opus-4-7",
+        model: str = "claude-sonnet-4-6",
         max_tokens: int = 2000,
         data_fetcher: DataFetcher | None = None,
         categories: tuple[str, ...] | None = None,
@@ -348,8 +348,9 @@ class RiskManager:
         timestamp: datetime,
     ) -> TradeProposal | None
         # Returns None if any gate fails. Gates checked in order:
-        # 1. min_confidence  2. max_positions  3. position sizing
-        # 4. available cash  5. daily loss cap  6. R:R ratio
+        # 1. neutral direction  2. min_confidence  3. max_positions
+        # 4. already has open position  5. daily loss cap  6. ATR > 0
+        # 7. R:R ratio  8. quantity > 0 after sizing/cash check
 ```
 
 ---
