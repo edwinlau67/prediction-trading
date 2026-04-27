@@ -3,8 +3,11 @@
 ## Launch Commands
 
 ```bash
-# Web UI (recommended)
+# Streamlit UI (self-contained, no API required)
 uv run streamlit run frontend/app.py
+
+# Dash UI (requires API running first: make api-dev)
+make dash-dev    # uv run python dash-frontend/app.py → http://localhost:8050
 
 # REST API server
 uv run uvicorn prediction_trading.api.main:app --reload
@@ -29,7 +32,7 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 
 ---
 
-## Web UI Pages
+## Streamlit UI Pages (`make ui-dev` → `:8501`)
 
 | Page | Icon | Primary Action |
 |---|---|---|
@@ -42,7 +45,7 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 | Alerts | 🔔 | Create price/confidence/P&L triggers; check & triggered log |
 | Settings | ⚙️ | Risk profiles, all config sliders → saves `config/default.yaml` |
 
-**Shared UI elements:**
+**Shared Streamlit UI elements:**
 
 | Element | Location | Notes |
 |---|---|---|
@@ -50,6 +53,26 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 | Config Info Bar | Below page title (all pages except Settings) | Data source · Broker · AI model or "disabled" |
 | Sidebar watchlist | Left sidebar | Click ticker → opens in Predict; persisted to `watchlist.json` |
 | `alerts.json` | Working directory | Alert state persisted across browser refreshes |
+
+---
+
+## Dash UI Pages (`make api-dev` + `make dash-dev` → `:8050`)
+
+Dash UI is a REST client — start `make api-dev` first. Dark theme only.
+
+| Page | Route | Primary Action |
+|---|---|---|
+| Dashboard | `/` | 10 s live polling — equity KPIs, equity curve (360 pts), positions/trades/risk tabs |
+| Predict | `/predict` | Prediction with per-run model selector; Signal/Factors/AI Narrative/Candlestick tabs |
+| Scanner | `/scanner` | Watchlist scan; auto-refresh (30 s); results stored cross-page in `scan-results-store` |
+| **Analytics** | `/analytics` | **Dash-only** — confidence histogram, direction donut, factor frequency, category heatmap, ticker scatter |
+| Trading | `/trading` | Start AutoTrader via API; last-cycle actions table (OPEN/CLOSE/ERROR); 10 s polling |
+| Backtest | `/backtest` | 8 KPI cards; equity curve, candlestick+trade markers, Trade Log DataTable |
+| Alerts | `/alerts` | Create/check/delete alerts; localStorage persistence via `alerts-store` |
+| Portfolio Builder | `/portfolio` | Holdings cards; Diversification Score; Correlation Heatmap; Sector Exposure |
+| Settings | `/settings` | 8 accordion sections; GET/PUT `/config/` API |
+
+Full Dash page reference: [`docs/DASH_UI_GUIDE.md`](DASH_UI_GUIDE.md)
 
 ---
 

@@ -35,15 +35,31 @@ uv run stock-predictor --tickers AAPL --no-ai
 
 ---
 
-## Launch the Web UI
+## Launch the Web UIs
+
+Two web frontends are available. Both use the same prediction and risk engine.
+
+| UI | Command | URL | Prerequisite |
+|---|---|---|---|
+| **Streamlit** | `make ui-dev` | `http://localhost:8501` | None (self-contained) |
+| **Dash** | `make dash-dev` | `http://localhost:8050` | `make api-dev` must be running |
 
 ```bash
+# Streamlit (standalone)
 make ui-dev    # or: uv run streamlit run frontend/app.py
+
+# Dash (needs API)
+make api-dev   # Terminal 1 — FastAPI on :8000
+make dash-dev  # Terminal 2 — Dash on :8050
 ```
 
-Opens at `http://localhost:8501`.
+The **Dash UI** connects to the REST API and adds a dedicated **Analytics** page (confidence distribution, factor frequency, category heatmap, ticker scatter) not present in Streamlit. See [`docs/DASH_UI_GUIDE.md`](DASH_UI_GUIDE.md) for the full Dash page reference.
 
-### Getting Started
+The sections below document the **Streamlit UI**. The Dash UI page reference follows in [Dash Web UI](#dash-web-ui).
+
+---
+
+### Streamlit UI — Getting Started
 
 **Header:** The app name appears at the top-left. A **🌙 Dark / ☀️ Light** toggle in the top-right switches the entire UI between a dark (`#0f1318` background) and light theme.
 
@@ -334,6 +350,98 @@ Select a preset (Conservative / Moderate / Aggressive) and click **Apply Profile
 **Broker:** paper (default) · alpaca.
 
 **Save Settings button:** Writes all values to `config/default.yaml`. Changes take effect immediately for new predictions and scans. The AutoTrader must be stopped and restarted to pick up new settings.
+
+---
+
+## Dash Web UI
+
+The Dash UI (`dash-frontend/`) is a real-time dashboard built with Plotly Dash + Bootstrap. It calls the FastAPI backend at `localhost:8000` rather than the Python backend directly.
+
+```bash
+make api-dev   # start FastAPI (Terminal 1)
+make dash-dev  # start Dash on :8050 (Terminal 2)
+```
+
+For the full per-page reference see [`docs/DASH_UI_GUIDE.md`](DASH_UI_GUIDE.md). Page summary:
+
+### Page Reference
+
+#### 1. Dashboard (`/`)
+
+Live trading monitor. Polls `/trading/status` every 10 s via `dcc.Interval`. KPI row: Portfolio Equity · Cash · Open Positions · Running/Stopped badge. Equity curve accumulates up to 360 data points (1 hour). Tabs: **Open Positions** (Ticker · Side · Qty · Entry · Stop · Target · Unrealised P&L), **Recent Trades** (entry/exit/P&L/reason), **Risk** (Win Rate · Profit Factor · Max Drawdown · Total Trades · Cycles).
+
+---
+
+#### 2. Predict (`/predict`)
+
+Inputs: Ticker · Timeframe · Enable AI toggle · **Claude Model selector** (per-run, unlike Streamlit which sets the model in Settings) · 4H Confluence toggle · Indicator Categories multiselect (all 9 available). Result tabs: **Signal** (direction badge, confidence gauge, Timing Recommendation card, Market Index table), **Factors** (bar chart top 15), **AI Narrative**, **Candlestick**. Result saved to `predict-result-store` for Analytics.
+
+---
+
+#### 3. Scanner (`/scanner`)
+
+Inputs: Watchlist textarea · Min Confidence slider · Parallel Workers input. Summary KPIs: Total Scanned / BUY / SELL / HOLD. Results table (sortable/filterable). **Export CSV** button. **Auto-refresh toggle** (30 s). Results saved to `scan-results-store` for Analytics.
+
+---
+
+#### 4. Analytics (`/analytics`) — Dash-only
+
+Requires at least one Scan or Predict run in the current session. Filters: Min Confidence · Direction checklist.
+
+Five chart tabs:
+
+| Tab | Chart |
+|---|---|
+| Confidence Distribution | Histogram overlay by direction |
+| Direction Breakdown | Donut pie (BUY / SELL / HOLD counts) |
+| Factor Frequency | Horizontal bar of top 20 most frequent factors |
+| Category Heatmap | 9 categories × tickers grid, net points (red = bearish, green = bullish) |
+| Ticker Confidence | Scatter: ticker × confidence, sized by confidence, labeled by direction |
+
+---
+
+#### 5. Trading (`/trading`)
+
+**Stopped:** Start form — Tickers · Initial Capital · Dry Run toggle · Enforce Market Hours toggle · Cycle Interval slider (60–3600 s) · State File Path. Starts AutoTrader via `POST /trading/start`.
+
+**Running:** Status banner showing ticker count and cycle count. KPI row. Open Positions table. **Last Cycle** panel: timestamp range + Actions table (Ticker · Action `OPEN`/`CLOSE`/`ERROR` color-coded · Direction · Confidence · Price · Reason). 10 s polling.
+
+---
+
+#### 6. Backtest (`/backtest`)
+
+Inputs: Ticker · Start Date · End Date · Initial Capital (min $1,000) · Commission. Results: 8 KPI cards (same as Streamlit). Tabs: **Equity Curve** · **Candlestick + Trades** (buy ▲ / sell ▼ markers) · **Trade Log** DataTable (sortable).
+
+---
+
+#### 7. Alerts (`/alerts`)
+
+Three tabs: **Active Alerts** (cards with ✕ Delete + Check Alerts Now button) · **Create Alert** (Ticker · Trigger Type · Value) · **Triggered Log** (last 50, Clear Log). State persisted to `alerts-store` (localStorage) — survives browser refresh and tab close.
+
+Trigger types: Price above · Price below · Confidence ≥ · Daily P&L ≥ · Daily P&L ≤.
+
+---
+
+#### 8. Portfolio Builder (`/portfolio`)
+
+Inputs: Tickers textarea · Lookback Days (30–1260, default 252). Results: Holdings cards (ETF/Stock badge, name, category, expense ratio) · Diversification Score (0–1, green/yellow/red) · Correlation Heatmap · Sector Exposure bar chart · Recommendations alerts.
+
+---
+
+#### 9. Settings (`/settings`)
+
+Eight accordion sections — same parameters as the Streamlit Settings page. Loads config from `GET /config/` on mount; saves via `PUT /config/`. A note reminds you to restart the API server for changes to broker/data-source settings to take effect.
+
+| Accordion | Parameters |
+|---|---|
+| Portfolio | Initial Capital · Max Positions · Max Position Size % · Commission |
+| Risk Management | Max Daily Loss % · Min R:R · Stop ATR Mult · TP ATR Mult |
+| Signal Settings | Min Confidence · AI Weight · Multi-Timeframe Bonus |
+| Indicator Categories | Multiselect of all 9 categories |
+| AI / Claude Settings | Enable AI · Model · Timeframe · Max Tokens |
+| Auto-Trader | Cycle Interval · Dry Run · Market Hours · Slippage bps |
+| Data Source | yfinance · alpaca · both |
+| Broker | paper · alpaca · Paper Trading Mode |
 
 ---
 

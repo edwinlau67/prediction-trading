@@ -33,7 +33,10 @@ uv run automated-trader --tickers AAPL TSLA --dry-run --once
 uv run automated-trader --tickers AAPL --interval 300 --market-hours
 
 # Launch Streamlit web UI
-make ui-dev           # streamlit run frontend/app.py
+make ui-dev           # streamlit run frontend/app.py → :8501
+
+# Launch Dash web UI (requires API running first)
+make dash-dev         # uv run python dash-frontend/app.py → :8050
 
 # Launch REST API
 make api-dev          # uvicorn on :8000 with --reload
@@ -64,12 +67,14 @@ make type-check
 
 ## Architecture
 
-Monorepo (uv workspace): `backend/` (core engine + FastAPI + CLI) and `frontend/` (Streamlit UI) are separate packages wired together by `prediction_trading/system.py:PredictionTradingSystem`.
+Monorepo (uv workspace): `backend/` (core engine + FastAPI + CLI), `frontend/` (Streamlit UI), and `dash-frontend/` (Dash UI) are wired together by `prediction_trading/system.py:PredictionTradingSystem`.
 
 ```
 CLI entry points (stock-predictor, automated-trader, scan-watchlist)
-Web UI           (frontend/app.py → frontend/ui/pages/: dashboard, predict, scanner,
+Streamlit UI     (frontend/app.py → frontend/ui/pages/: dashboard, predict, scanner,
                   backtest, trading, portfolio_builder, alerts, settings)
+Dash UI          (dash-frontend/app.py → dash_ui/pages/: home, predict, scanner,
+                  analytics, trading, backtest, alerts, portfolio, settings)
 REST API         (prediction_trading/api/ — FastAPI :8000)
         │
 prediction_trading/system.py — PredictionTradingSystem (facade)
@@ -83,9 +88,10 @@ prediction_trading/backtest/    ← bar-by-bar Backtester
 prediction_trading/indicators/  ← TechnicalIndicators, SupportResistance
 prediction_trading/data_fetcher.py ← yfinance OHLCV + fundamentals
 frontend/ui/                    ← Streamlit pages + shared components
+dash_ui/                        ← Dash pages + components + api client
 ```
 
-### UI conventions
+### Streamlit UI conventions
 
 - All pages call `config_info_bar()` from `ui/components.py` except Settings.
 - Theme CSS is injected once in `frontend/app.py` via `inject_theme(dark: bool)` from `ui/theme.py`.
@@ -93,6 +99,15 @@ frontend/ui/                    ← Streamlit pages + shared components
 - Watchlist persists to `watchlist.json`; alerts persist to `alerts.json` — both in the working directory.
 - All session state keys are string constants defined in `ui/state.py`.
 - Slow ops (predict, backtest, scan) cache results in `st.session_state` to prevent re-running on widget interactions.
+
+### Dash UI conventions
+
+- All pages are auto-registered via `dash.register_page(__name__, path=..., order=...)` in `dash_ui/pages/`.
+- All HTTP calls go through `dash_ui/api.py` (base URL `http://localhost:8000`; 10 s / 60 s timeouts).
+- Reusable chart factories live in `dash_ui/components.py`; color palette and `PLOTLY_DARK_LAYOUT` in `dash_ui/theme.py`.
+- Cross-page state uses `dcc.Store`: `scan-results-store` and `predict-result-store` are session-scoped globals (defined in `app.py`); `alerts-store` is localStorage-scoped (persists across sessions).
+- Live polling uses `dcc.Interval` components — Dashboard and Trading pages poll `/trading/status` every 10 s.
+- All 9 categories are available in the Predict page multiselect (unlike Streamlit which limits to 6 in the UI).
 
 ### Prediction pipeline
 

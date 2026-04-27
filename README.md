@@ -39,7 +39,7 @@
 - **Alpaca broker integration** for live/paper trading via `AlpacaBroker`
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
 - **FastAPI REST API** with OpenAPI docs at `/docs`
-- **Streamlit web UI** with eight pages, live price badges, config info bar, and light/dark theme
+- **Two web UIs:** Streamlit (`frontend/`, 8 pages, self-contained) and Dash (`dash-frontend/`, 9 pages, connects to REST API) — both with live trading dashboard and dark theme
 
 ---
 
@@ -68,8 +68,9 @@ Or use `make`:
 ```bash
 make install      # uv sync --all-packages
 make test         # pytest backend/tests/
-make ui-dev       # streamlit run frontend/app.py
+make ui-dev       # streamlit run frontend/app.py  → :8501
 make api-dev      # uvicorn on :8000
+make dash-dev     # uv run python dash-frontend/app.py  → :8050 (needs api-dev)
 ```
 
 ---
@@ -92,8 +93,11 @@ prediction-trading/
 │   │   └── system.py             # PredictionTradingSystem (primary facade)
 │   └── tests/                    # 115 tests across 14 files, no network or API key required
 ├── frontend/
-│   ├── app.py                    # Streamlit entry point
+│   ├── app.py                    # Streamlit entry point (self-contained, :8501)
 │   └── ui/                       # pages, components, theme, watchlist
+├── dash-frontend/
+│   ├── app.py                    # Dash entry point (requires API on :8000, serves :8050)
+│   └── dash_ui/                  # pages, components, theme, api client
 ├── config/
 │   ├── default.yaml
 │   └── risk_profiles.yaml
@@ -104,12 +108,18 @@ prediction-trading/
 
 ---
 
-## Web UI
+## Web UIs
+
+Two web interfaces are available. Both share the same prediction engine but differ in architecture and capabilities.
+
+### Streamlit UI (`frontend/`)
 
 ```bash
 make ui-dev    # or: uv run streamlit run frontend/app.py
 # opens http://localhost:8501
 ```
+
+Self-contained — calls the Python backend directly, no API server required.
 
 **Layout:** An 8-button **top navigation bar** selects the active page. A **🌙 Dark / ☀️ Light** toggle in the header switches the full theme. A **persistent sidebar watchlist** shows live price badges for saved tickers; clicking any ticker navigates to the Predict page. All pages except Settings show a **Config Info Bar** (data source · broker · AI model/status).
 
@@ -124,7 +134,32 @@ make ui-dev    # or: uv run streamlit run frontend/app.py
 | **Alerts** | 🔔 | Create Price above/below, Confidence ≥, or Daily P&L triggers. Active Alerts tab with delete buttons; Check Now evaluates against live prices. Triggered Log (last 50). State persisted to `alerts.json`. |
 | **Settings** | ⚙️ | Risk profile presets (conservative/moderate/aggressive). Full parameter controls for portfolio, risk, signals, indicator categories, AI/Claude model, AutoTrader, data source, and broker. Saves to `config/default.yaml`. |
 
-For a full per-page walkthrough see [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md).
+### Dash UI (`dash-frontend/`)
+
+```bash
+# Start the API first (Dash UI is a REST client)
+make api-dev    # uvicorn on :8000
+
+# Then start the Dash UI
+make dash-dev   # or: uv run python dash-frontend/app.py
+# opens http://localhost:8050
+```
+
+Real-time dashboard using Plotly Dash + Bootstrap (dark theme). Connects to the FastAPI backend at `localhost:8000` via `dash_ui/api.py`. Features `dcc.Interval` polling (no page reloads), `dcc.Store` cross-page state sharing, and a dedicated **Analytics** page absent from the Streamlit UI.
+
+| Page | Route | Key Features |
+|---|---|---|
+| **Dashboard** | `/` | Live 10 s polling of `/trading/status`; KPI row; equity curve (up to 360 points); tabs: Open Positions, Recent Trades, Risk KPIs. |
+| **Predict** | `/predict` | Per-run Claude model selector; tabs: Signal (gauge + timing + index table), Factors bar chart, AI Narrative, Candlestick chart. Result stored in `predict-result-store`. |
+| **Scanner** | `/scanner` | Watchlist scan with auto-refresh toggle (30 s); CSV export; results stored in `scan-results-store`. |
+| **Analytics** | `/analytics` | **Dash-only.** Visualizes data from Scanner + Predict stores: Confidence Distribution histogram, Direction donut, Factor Frequency bar, Category Heatmap (9 categories × tickers), Ticker Confidence scatter. |
+| **Trading** | `/trading` | Start form with cycle-interval slider (60–3600 s); running view: status banner, positions table, last-cycle actions (OPEN/CLOSE/ERROR color-coded). |
+| **Backtest** | `/backtest` | 8 KPI cards; tabs: Equity Curve, Candlestick+Trades (buy ▲ / sell ▼ markers), Trade Log DataTable. |
+| **Alerts** | `/alerts` | Create/delete/check alerts; Triggered Log; state in `localStorage` via `alerts-store`. |
+| **Portfolio Builder** | `/portfolio` | Holdings cards (ETF/Stock badge); Diversification Score; Correlation Heatmap; Sector Exposure bar chart; recommendations. |
+| **Settings** | `/settings` | 8 accordion sections; loads from `GET /config/`, saves via `PUT /config/`. |
+
+For the full Dash UI walkthrough see [`docs/DASH_UI_GUIDE.md`](docs/DASH_UI_GUIDE.md). For the full Streamlit walkthrough see [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md).
 
 ---
 
@@ -430,7 +465,8 @@ All 115 tests across 14 files use synthetic OHLCV fixtures (`backend/tests/conft
 
 | Document | Contents |
 |----------|----------|
-| [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough |
+| [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough including Streamlit UI per-page reference |
+| [`docs/DASH_UI_GUIDE.md`](docs/DASH_UI_GUIDE.md) | Dash UI per-page reference (all 9 pages) |
 | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Python and REST API reference |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture deep-dive |
 | [`docs/EXAMPLES.md`](docs/EXAMPLES.md) | Annotated code examples |
