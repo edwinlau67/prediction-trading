@@ -39,7 +39,7 @@ ai:
 data:
   lookback_days: 365
   interval: 1d
-  source: alpaca
+  source: yfinance
 broker:
   type: paper
   paper_trading: true
