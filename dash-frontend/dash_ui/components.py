@@ -8,6 +8,81 @@ import dash_bootstrap_components as dbc
 from dash_ui import theme
 
 
+def status_bar(config_data: dict | None, api_online: bool) -> dbc.Container:
+    """Compact status bar shown between navbar and page content on every page."""
+    _label_style = {
+        "fontSize": "10px", "textTransform": "uppercase",
+        "letterSpacing": "0.5px", "color": "var(--theme-muted)", "marginRight": "4px",
+    }
+    _badge_style = {"fontSize": "11px"}
+    _bar_style = {
+        "backgroundColor": "var(--theme-card-bg)",
+        "borderBottom": "1px solid var(--theme-border)",
+        "padding": "5px 24px",
+    }
+
+    if not api_online or not config_data:
+        return dbc.Container(
+            dbc.Row([
+                dbc.Col(
+                    dbc.Badge(
+                        [html.I(className="bi bi-exclamation-triangle-fill me-1"), "API Offline"],
+                        color="danger", style=_badge_style,
+                    ),
+                    width="auto",
+                ),
+            ], className="align-items-center g-1"),
+            fluid=True, style=_bar_style,
+        )
+
+    data_cfg   = config_data.get("data", {})
+    ai_cfg     = config_data.get("ai", {})
+    broker_cfg = config_data.get("broker", {})
+    trader_cfg = config_data.get("trader", {})
+
+    data_source   = data_cfg.get("source", "yfinance")
+    data_interval = data_cfg.get("interval", "1d")
+    ai_enabled    = ai_cfg.get("enabled", False)
+    ai_model      = ai_cfg.get("model", "—")
+    model_label   = ai_model if ai_enabled else "Rule-based"
+    broker_type   = broker_cfg.get("type", "paper")
+    paper_trading = broker_cfg.get("paper_trading", True)
+    broker_label  = "Paper" if (broker_type == "paper" or paper_trading) else "Alpaca"
+    broker_color  = "secondary" if broker_label == "Paper" else "warning"
+    dry_run       = trader_cfg.get("dry_run", True)
+    live_dot_color = "#6c757d" if dry_run else "#26d96a"
+
+    def _item(label: str, badge_content, color: str) -> dbc.Col:
+        return dbc.Col(
+            html.Span([
+                html.Span(label, style=_label_style),
+                dbc.Badge(badge_content, color=color, style=_badge_style, className="me-3"),
+            ]),
+            width="auto",
+        )
+
+    cols = [
+        _item("Data", data_source, "primary"),
+        _item("Feed", data_interval, "info"),
+        _item("Model", model_label, "success" if ai_enabled else "secondary"),
+        dbc.Col(
+            html.Span([
+                html.Span("Broker", style=_label_style),
+                dbc.Badge(
+                    [html.Span("● ", style={"color": live_dot_color, "fontSize": "9px"}), broker_label],
+                    color=broker_color, style=_badge_style,
+                ),
+            ]),
+            width="auto",
+        ),
+    ]
+
+    return dbc.Container(
+        dbc.Row(cols, className="align-items-center g-1"),
+        fluid=True, style=_bar_style,
+    )
+
+
 def kpi_card(title: str, value: str, delta: str | None = None, delta_positive: bool | None = None) -> dbc.Card:
     delta_color = theme.MUTED
     if delta is not None and delta_positive is not None:
@@ -34,10 +109,11 @@ def direction_badge(direction: str) -> html.Span:
     )
 
 
-def factor_bar_chart(factors: list[dict], height: int = 380) -> go.Figure:
+def factor_bar_chart(factors: list[dict], height: int = 380, plotly_layout: dict | None = None) -> go.Figure:
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not factors:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=height, title="No factors available")
+        fig.update_layout(**base_layout, height=height, title="No factors available")
         return fig
 
     sorted_factors = sorted(factors, key=lambda f: abs(f.get("points", 0)), reverse=True)[:15]
@@ -55,31 +131,38 @@ def factor_bar_chart(factors: list[dict], height: int = 380) -> go.Figure:
         hovertext=hover,
         hovertemplate="%{y}<br>Points: %{x}<br>%{hovertext}<extra></extra>",
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base_layout)
     layout.update(
         height=height,
         title="Signal Factors",
-        xaxis=dict(**theme.PLOTLY_DARK_LAYOUT["xaxis"], title="Points (+ bullish / − bearish)"),
-        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], autorange="reversed"),
+        xaxis=dict(**base_layout["xaxis"], title="Points (+ bullish / − bearish)"),
+        yaxis=dict(**base_layout["yaxis"], autorange="reversed"),
     )
     fig.update_layout(**layout)
     return fig
 
 
-def confidence_gauge(direction: str, confidence: float, height: int = 220) -> go.Figure:
+def confidence_gauge(direction: str, confidence: float, height: int = 220, plotly_layout: dict | None = None) -> go.Figure:
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     color = theme.DIRECTION_COLORS.get(direction, theme.MUTED)
     label = theme.DIRECTION_LABELS.get(direction, direction.upper())
     pct = round(confidence * 100, 1)
+    is_light = base_layout.get("template") == "plotly_white"
+    gauge_bg = "#e9ecef" if is_light else "#21262d"
+    step_lo   = "#f8d7da" if is_light else "#3a1a1a"
+    step_mid  = "#e9ecef" if is_light else "#21262d"
+    step_hi   = "#d1e7dd" if is_light else "#0d3a1f"
+    num_color = "#212529" if is_light else theme.TEXT
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=pct,
-        number={"suffix": "%", "font": {"size": 28, "color": theme.TEXT}},
+        number={"suffix": "%", "font": {"size": 28, "color": num_color}},
         title={"text": label, "font": {"size": 16, "color": color}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": theme.MUTED},
             "bar": {"color": color},
-            "bgcolor": "#21262d",
+            "bgcolor": gauge_bg,
             "bordercolor": theme.BORDER,
             "threshold": {
                 "line": {"color": theme.YELLOW, "width": 2},
@@ -87,22 +170,23 @@ def confidence_gauge(direction: str, confidence: float, height: int = 220) -> go
                 "value": 40,
             },
             "steps": [
-                {"range": [0, 40], "color": "#3a1a1a"},
-                {"range": [40, 60], "color": "#21262d"},
-                {"range": [60, 100], "color": "#0d3a1f"},
+                {"range": [0, 40], "color": step_lo},
+                {"range": [40, 60], "color": step_mid},
+                {"range": [60, 100], "color": step_hi},
             ],
         },
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base_layout)
     layout.update(height=height, margin=dict(l=20, r=20, t=60, b=20))
     fig.update_layout(**layout)
     return fig
 
 
-def equity_line_chart(equity_points: list[dict], height: int = 300, initial_capital: float | None = None) -> go.Figure:
+def equity_line_chart(equity_points: list[dict], height: int = 300, initial_capital: float | None = None, plotly_layout: dict | None = None) -> go.Figure:
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not equity_points:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=height, title="No equity data yet")
+        fig.update_layout(**base_layout, height=height, title="No equity data yet")
         return fig
 
     xs = [p["ts"] for p in equity_points]
@@ -129,8 +213,8 @@ def equity_line_chart(equity_points: list[dict], height: int = 300, initial_capi
     ))
 
     fig = go.Figure(traces)
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
-    layout.update(height=height, title="Equity Curve", yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], tickprefix="$"))
+    layout = dict(base_layout)
+    layout.update(height=height, title="Equity Curve", yaxis=dict(**base_layout["yaxis"], tickprefix="$"))
     fig.update_layout(**layout)
     return fig
 
@@ -141,10 +225,12 @@ def candlestick_chart(
     entry: float | None = None,
     stop: float | None = None,
     target: float | None = None,
+    plotly_layout: dict | None = None,
 ) -> go.Figure:
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not ohlcv:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=height)
+        fig.update_layout(**base_layout, height=height)
         return fig
 
     dates = [r["date"] for r in ohlcv]
@@ -175,7 +261,7 @@ def candlestick_chart(
             fig.add_hline(y=level, line_dash=dash, line_color=color, annotation_text=f"{label}: ${level:.2f}",
                           annotation_position="right", row=1, col=1)
 
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base_layout)
     layout.update(height=height, showlegend=False, xaxis_rangeslider_visible=False)
     fig.update_layout(**layout)
     fig.update_yaxes(tickprefix="$", row=1, col=1)
@@ -188,12 +274,14 @@ def analysis_chart(
     levels: dict,
     timing: dict | None = None,
     height: int = 1200,
+    plotly_layout: dict | None = None,
 ) -> go.Figure:
     from plotly.subplots import make_subplots
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
 
     if not ohlcv:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=height)
+        fig.update_layout(**base_layout, height=height)
         return fig
 
     dates = [r["date"] for r in ohlcv]
@@ -415,19 +503,19 @@ def analysis_chart(
             )
 
     # ── Layout ────────────────────────────────────────────────────────────────
-    base = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT.items() if k not in ("xaxis", "yaxis")}
-    base.update(
+    lbase = {k: v for k, v in base_layout.items() if k not in ("xaxis", "yaxis")}
+    lbase.update(
         height=height,
         hovermode="x unified",
         showlegend=False,
         margin=dict(l=60, r=90, t=30, b=40),
     )
-    fig.update_layout(**base)
+    fig.update_layout(**lbase)
     fig.update_layout(xaxis_rangeslider_visible=False)
     # Global axis styles
-    ax_x = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT["xaxis"].items() if k != "rangeslider"}
+    ax_x = {k: v for k, v in base_layout["xaxis"].items() if k != "rangeslider"}
     fig.update_xaxes(**ax_x)
-    fig.update_yaxes(**theme.PLOTLY_DARK_LAYOUT["yaxis"])
+    fig.update_yaxes(**base_layout["yaxis"])
     # Per-row y-axis
     fig.update_yaxes(tickprefix="$", row=1, col=1)
     fig.update_yaxes(range=[0, 100], fixedrange=True, row=4, col=1)
@@ -439,13 +527,13 @@ def analysis_chart(
     return fig
 
 
-def fundamentals_chart(fundamentals: dict, ticker: str = "") -> go.Figure:
+def fundamentals_chart(fundamentals: dict, ticker: str = "", plotly_layout: dict | None = None) -> go.Figure:
     from plotly.subplots import make_subplots
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
 
     if not fundamentals:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=380,
-                          title="No fundamental data available")
+        fig.update_layout(**base_layout, height=380, title="No fundamental data available")
         return fig
 
     val_items = [
@@ -507,11 +595,11 @@ def fundamentals_chart(fundamentals: dict, ticker: str = "") -> go.Figure:
             hovertemplate="%{y}: %{x:.2f}%<extra></extra>",
         ), row=1, col=2)
 
-    base = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT.items() if k not in ("xaxis", "yaxis")}
-    base.update(height=380, title=f"{ticker} Fundamentals" if ticker else "Fundamentals")
-    fig.update_layout(**base)
-    fig.update_xaxes(**theme.PLOTLY_DARK_LAYOUT["xaxis"])
-    fig.update_yaxes(**theme.PLOTLY_DARK_LAYOUT["yaxis"])
+    fbase = {k: v for k, v in base_layout.items() if k not in ("xaxis", "yaxis")}
+    fbase.update(height=380, title=f"{ticker} Fundamentals" if ticker else "Fundamentals")
+    fig.update_layout(**fbase)
+    fig.update_xaxes(**base_layout["xaxis"])
+    fig.update_yaxes(**base_layout["yaxis"])
     fig.update_xaxes(title_text="Ratio", row=1, col=1)
     fig.update_xaxes(title_text="%", row=1, col=2)
     for ann in fig.layout.annotations:
@@ -520,11 +608,11 @@ def fundamentals_chart(fundamentals: dict, ticker: str = "") -> go.Figure:
     return fig
 
 
-def index_performance_chart(indexes: list[dict]) -> go.Figure:
+def index_performance_chart(indexes: list[dict], plotly_layout: dict | None = None) -> go.Figure:
+    base_layout = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not indexes:
         fig = go.Figure()
-        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=320,
-                          title="No market data available")
+        fig.update_layout(**base_layout, height=320, title="No market data available")
         return fig
 
     _colors = {
@@ -549,12 +637,12 @@ def index_performance_chart(indexes: list[dict]) -> go.Figure:
             hovertemplate=f"<b>{name}</b><br>%{{x}}: %{{y:+.2f}}%<extra></extra>",
         ))
 
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base_layout)
     layout.update(
         height=350,
         title="Index Performance",
         barmode="group",
-        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], title="% Change", ticksuffix="%"),
+        yaxis=dict(**base_layout["yaxis"], title="% Change", ticksuffix="%"),
     )
     fig.update_layout(**layout)
     fig.add_hline(y=0, line_color=theme.MUTED, line_width=0.6)
