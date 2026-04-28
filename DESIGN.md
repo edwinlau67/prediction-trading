@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.4 |
+| Version | 1.5 |
 | Status | Active |
-| Last updated | 2026-04-25 |
+| Last updated | 2026-04-28 |
 
 ---
 
@@ -47,9 +47,12 @@ prediction-trading/           ← uv workspace root (pyproject.toml)
 │   │   ├── scanner.py
 │   │   └── system.py
 │   └── tests/
-├── frontend/                 ← package: prediction-trading-frontend
+├── frontend/                 ← package: prediction-trading-frontend (Streamlit, dev)
 │   ├── app.py                ← Streamlit entry point
 │   └── ui/                   ← pages, components, theme, watchlist
+├── dash-frontend/            ← package: prediction-trading-dash (Plotly Dash, production)
+│   ├── app.py                ← Dash entry point (gunicorn-compatible `server`)
+│   └── dash_ui/              ← pages, components, theme, api client
 ├── config/
 ├── examples/
 └── Makefile
@@ -60,13 +63,14 @@ prediction-trading/           ← uv workspace root (pyproject.toml)
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             USER INTERFACES                                 │
-│  frontend/app.py (Streamlit)   stock-predictor   automated-trader           │
-│  scan-watchlist                examples/                                    │
-└──────────────┬──────────────────────────┬──────────────────────────────────┘
+│  dash-frontend/app.py (Plotly Dash, :8050)   frontend/app.py (Streamlit)    │
+│  stock-predictor   automated-trader   scan-watchlist   examples/            │
+└──────────────┬──────────────────────────┬───────────────────────────────────┘
                │                          │
-┌──────────────▼──────────────────────────▼──────────────────────────────────┐
+┌──────────────▼──────────────────────────▼───────────────────────────────────┐
 │              REST API  (prediction_trading.api — FastAPI :8000)             │
-│  POST /predict/   POST /scan/   POST /backtest/   GET+POST /trading/…       │
+│  POST /predict/   GET /predict/macro   POST /scan/   POST /backtest/        │
+│  GET+POST /trading/…   POST /portfolio/analyze   GET+PUT /config/           │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │
 ┌────────────────────────────────▼────────────────────────────────────────────┐
@@ -543,31 +547,51 @@ Errors in individual tickers are caught and returned as `ScanResult(error=str(ex
 
 | Router | Module | Path prefix | Methods | Delegates to |
 |---|---|---|---|---|
-| predict | `routers/predict.py` | `/predict` | `POST /` | `PredictionTradingSystem.predict()` |
+| predict | `routers/predict.py` | `/predict` | `POST /`, `GET /macro` | `PredictionTradingSystem.predict()`, `DataFetcher.fetch_macro_context()` |
 | scan | `routers/scan.py` | `/scan` | `POST /` | `WatchlistScanner.scan()` |
 | backtest | `routers/backtest.py` | `/backtest` | `POST /` | `PredictionTradingSystem.backtest()` |
 | trading | `routers/trading.py` | `/trading` | `GET /status`, `POST /start` | `AutoTrader` |
+| portfolio | `routers/portfolio.py` | `/portfolio` | `POST /analyze` | `ETFAnalyzer.analyze_portfolio()` |
+| config | `routers/config.py` | `/config` | `GET /`, `PUT /` | reads/writes `config/default.yaml` |
 
 **Health check:** `GET /health` → `{"status": "ok"}`.
+
+**`GET /predict/macro`:** Returns major market indexes (SPY, QQQ, DIA, IWM, VIX, etc.) with `price`, `change_1d_pct`, `change_5d_pct`, `change_30d_pct`, and `above_sma50` for each. Used by the Dash Predict page to render the Market Index Overview table without re-running a full prediction.
+
+**`PUT /config/` write semantics:** Loads `config/default.yaml`, merges the request body keys (only those in `_ALLOWED_KEYS = {portfolio, risk, signals, indicators, ai, trader, data, broker}`), and writes the merged document back as YAML (`default_flow_style=False, sort_keys=False`). API restart is required for runtime objects to pick up the new values.
 
 **Schemas** (`api/schemas.py`, Pydantic v2):
 
 | Schema | Direction | Key fields |
 |---|---|---|
 | `PredictRequest` | in | `ticker`, `timeframe`, `enable_ai`, `lookback_days`, `categories`, `use_4h` |
-| `PredictResponse` | out | `ticker`, `direction`, `confidence`, `current_price`, `price_target`, `factors: list[FactorResponse]`, `meta` |
+| `PredictResponse` | out | `ticker`, `direction`, `confidence`, `current_price`, `price_target`, `factors: list[FactorResponse]`, `timing: TimingResponse \| None`, `indicators`, `levels`, `fundamentals`, `ohlcv: list[dict]`, `meta` |
 | `ScanRequest` | in | `tickers`, `categories`, `min_confidence`, `workers` |
 | `ScanResponse` | out | `results: list[ScanResultResponse]`, `total` |
 | `BacktestRequest` | in | `ticker`, `start`, `end`, `initial_capital`, `commission` |
-| `BacktestResponse` | out | `stats: BacktestStatsResponse` |
-| `TradingStartRequest` | in | `tickers`, `initial_capital`, `dry_run`, `enforce_market_hours` |
-| `TradingStatusResponse` | out | `running`, `tickers`, `equity`, `cash`, `open_positions` |
+| `BacktestResponse` | out | `stats: BacktestStatsResponse`, `trades: list[TradeResponse]`, `equity_curve: list[EquityPointResponse]`, `ohlcv: list[dict]` |
+| `TradingStartRequest` | in | `tickers`, `initial_capital`, `dry_run`, `enforce_market_hours`, `interval_seconds`, `state_path` |
+| `TradingStatusResponse` | out | `running`, `tickers`, `equity`, `cash`, `open_positions`, `cycle_count`, `positions: list[PositionResponse]`, `recent_trades: list[RecentTradeResponse]`, `last_cycle: dict \| None` |
+| `PortfolioAnalyzeRequest` | in | `tickers`, `lookback_days` |
+| `PortfolioAnalysisResponse` | out | `tickers`, `diversification_score`, `correlation_matrix: dict[str, dict[str, float]]`, `sector_exposure: dict[str, float]`, `recommendations: list[str]`, `etf_infos: list[ETFInfoResponse]` |
+| `ETFInfoResponse` | out | `ticker`, `name`, `category`, `tracked_index`, `expense_ratio`, `is_etf` |
 
 **Configuration:** `api/deps.py:get_default_config()` loads `config/default.yaml` at startup via the lifespan hook.
 
 ---
 
-## 5. Streamlit Web UI (`frontend/app.py`, `frontend/ui/`)
+## 5. Web UIs
+
+The system ships **two parallel front-ends**, both depending on `prediction-trading-backend` via uv workspace dependency:
+
+| UI | Package | Framework | Entry point | Default port | Make target | Role |
+|---|---|---|---|---|---|---|
+| Streamlit | `prediction-trading-frontend` (`frontend/`) | Streamlit | `frontend/app.py` | 8501 | `make ui-dev` | Reference / dev iteration. Calls the engine in-process via `PredictionTradingSystem`. |
+| Dash | `prediction-trading-dash` (`dash-frontend/`) | Plotly Dash + dash-bootstrap-components | `dash-frontend/app.py` | 8050 | `make dash-dev` | Production dashboard. Talks to FastAPI over HTTP only; deployable behind gunicorn (`server = app.server`). |
+
+The Streamlit UI imports backend modules directly (single-process). The Dash UI is a thin HTTP client of the REST API in §4.16, with no direct backend imports — `dash-frontend/pyproject.toml` does not depend on `prediction-trading-backend`. Both UIs share the same dark-on-light color palette (`GREEN=#26d96a`, `RED=#ff6464`, `BLUE=#58a6ff`, `YELLOW=#f0b429`, `MUTED=#b0b8c4`).
+
+### 5.1 Streamlit Web UI (`frontend/app.py`, `frontend/ui/`)
 
 Entry point: `frontend/app.py` — launched via `make ui-dev` (`streamlit run frontend/app.py`, default port 8501). `frontend/` is a separate uv workspace package (`prediction-trading-frontend`) that lists `prediction-trading-backend` as a dependency.
 
@@ -578,7 +602,7 @@ Additional UI modules:
 - `ui/watchlist.py` — watchlist state persisted to `watchlist.json`; tickers can be added/removed from any page.
 - `ui/components.py` — shared Plotly chart helpers and a dark-mode color palette (`bullish=#00d25b`, `bearish=#ff4b4b`, `neutral=#8b949e`); re-used across the Dashboard, Predict, Backtest, and Trading pages.
 
-### 5.1 Page inventory
+#### 5.1.1 Page inventory
 
 | Page | Module | Responsibility |
 |---|---|---|
@@ -591,11 +615,11 @@ Additional UI modules:
 | Alerts | `ui/pages/alerts.py` | Price/confidence/P&L trigger management. Triggers: price above/below, confidence ≥, daily P&L ≥/≤. Alert state persisted to `alerts.json`. |
 | Settings | `ui/pages/settings.py` | Risk profile selector (conservative/moderate/aggressive). Sliders for all `default.yaml` sections including indicator categories. Saves on button click. |
 
-### 5.2 Session state contract
+#### 5.1.2 Session state contract
 
 All slow operations (predict, backtest, scan) store their result in `st.session_state` on completion. Subsequent widget interactions re-render without re-running the computation. Keys are defined as string constants in `ui/state.py`.
 
-### 5.3 Trading page threading model
+#### 5.1.3 Trading page threading model
 
 ```
 render() ──► checks TRADER_RUNNING
@@ -614,11 +638,11 @@ _trader_loop(trader, interval, queue) ──► loop:
 
 The daemon thread is stopped implicitly when the main Streamlit process exits. The stop button sets `TRADER_RUNNING = False`; the loop exits on the next iteration check.
 
-### 5.4 Per-page UI specification
+#### 5.1.4 Per-page UI specification
 
 Developer-facing widget inventory for each page. Covers session state keys, widget types and value ranges, and helper functions from `ui/components.py`.
 
-#### 5.4.1 Dashboard (`ui/pages/dashboard.py`)
+##### 5.1.4.1 Dashboard (`ui/pages/dashboard.py`)
 
 Session state keys read: `TRADER_INSTANCE` (live AutoTrader), `BT_RESULT` (last backtest).
 Portfolio load priority: (1) live AutoTrader from session state, (2) backtest result from session state, (3) file upload (`st.file_uploader` → parse `portfolio_state.json`).
@@ -630,7 +654,7 @@ Layout:
 - Risk: 4-column `metric_card()` row; `st.progress()` bar for daily loss vs cap; horizontal `go.Bar` chart (Plotly) for position concentration.
 - Auto-refresh: `<meta http-equiv="refresh" content="15">` injected via `st.markdown` when AutoTrader is running.
 
-#### 5.4.2 Predict (`ui/pages/predict.py`)
+##### 5.1.4.2 Predict (`ui/pages/predict.py`)
 
 Session state keys: `PREDICT_RESULT`, `PREDICT_TICKER`, `PREDICT_OHLCV`, `PREDICT_CHART_PATH`, `PREDICT_DATA_FEED`, `PREDICT_MACRO_CONTEXT`.
 
@@ -642,7 +666,7 @@ Widgets:
 
 Result tabs: `tab_signal` calls `prediction_card()`, `_render_timing_card()`, `_render_index_table()`; `tab_chart` calls `candlestick_chart()` (Plotly, height 420); `tab_static` renders `st.image()` from `PREDICT_CHART_PATH`.
 
-#### 5.4.3 Scanner (`ui/pages/scanner.py`)
+##### 5.1.4.3 Scanner (`ui/pages/scanner.py`)
 
 Session state key: `SCAN_RESULTS`.
 
@@ -654,7 +678,7 @@ Widgets:
 
 Results: 4-column summary cards; `st.columns([1,1,1,1,3,2])` grid per row; `st.download_button` with `io.BytesIO` CSV buffer.
 
-#### 5.4.4 Backtest (`ui/pages/backtest.py`)
+##### 5.1.4.4 Backtest (`ui/pages/backtest.py`)
 
 Session state keys: `BT_RESULT`, `BT_TICKER`, `BT_OHLCV`, `BT_TRADES`.
 
@@ -662,7 +686,7 @@ Widgets: `st.text_input("Ticker")`, `st.date_input("Start/End Date")`, `st.numbe
 
 Result tabs: `tab_equity` → `equity_chart()`; `tab_candle` → `candlestick_chart()` with `buy_signals`/`sell_signals` trade markers (height 500); `tab_log` → `st.dataframe` (scrollable, max-height 500px). Save button calls `system.save_report(result=result)`.
 
-#### 5.4.5 Trading (`ui/pages/trading.py`)
+##### 5.1.4.5 Trading (`ui/pages/trading.py`)
 
 Session state keys: `TRADER_RUNNING`, `TRADER_INSTANCE`, `TRADER_THREAD`, `TRADER_QUEUE`, `TRADER_REPORTS`, `TRADER_ERRORS`.
 
@@ -670,13 +694,13 @@ Stopped state widgets (inside `st.form("trader_config")`): tickers textarea, `st
 
 Running state widgets: status `metric_card()`; stop button (`st.button` outside form); 3 KPI `metric_card()` calls; `equity_chart()`; positions dataframe; last-cycle expander with actions dataframe and errors expander. Auto-rerun: `time.sleep(10); st.rerun()` after draining queue.
 
-#### 5.4.6 Portfolio Builder (`ui/pages/portfolio_builder.py`)
+##### 5.1.4.6 Portfolio Builder (`ui/pages/portfolio_builder.py`)
 
 Widgets: `st.text_area("Tickers")`, `st.slider("Lookback Days", 30, 1260, 252)`.
 
 Output components: holdings cards in groups of 4 (`st.columns(4)`) with ETF/Stock badge based on `ETFAnalyzer.is_etf()`; diversification score displayed as `st.metric` with color via `st.markdown`; correlation heatmap as `go.Heatmap` with custom colorscale; sector exposure as `go.Bar`; recommendations as `st.warning` (high correlation/expense) or `st.info` (other).
 
-#### 5.4.7 Alerts (`ui/pages/alerts.py`)
+##### 5.1.4.7 Alerts (`ui/pages/alerts.py`)
 
 Session state keys: `ALERTS_LIST`, `ALERTS_TRIGGERED`. Persisted to `alerts.json` via `_load_alerts()` / `_save_alerts()`.
 
@@ -687,7 +711,7 @@ Three tabs: `tab_active`, `tab_create`, `tab_log`.
 
 HTML escaping applied to all user-supplied ticker inputs before rendering.
 
-#### 5.4.8 Settings (`ui/pages/settings.py`)
+##### 5.1.4.8 Settings (`ui/pages/settings.py`)
 
 Session state keys: `ACTIVE_PROFILE`, `SETTINGS_DIRTY`.
 
@@ -702,6 +726,109 @@ Sections and widgets:
 - Data source: `st.radio` (yfinance/alpaca/both); alpaca info box shown when alpaca/both selected.
 - Broker: `st.radio` (paper/alpaca); Alpaca paper mode toggle disabled when broker != alpaca.
 - Save button: `yaml.dump(config)` to `config/default.yaml`. Success toast notes that AutoTrader restart is required.
+
+---
+
+### 5.2 Dash Web UI (`dash-frontend/app.py`, `dash-frontend/dash_ui/`)
+
+Entry point: `dash-frontend/app.py` — launched via `make dash-dev` (`uv run python dash-frontend/app.py`, default port 8050). The Dash app uses pages auto-discovery (`use_pages=True`, `pages_folder="dash_ui/pages"`) and exposes `server = app.server` so it can be served by gunicorn in production.
+
+Unlike the Streamlit UI, the Dash UI does **not** import the backend Python package. All data flow goes through HTTP calls to the FastAPI server (default `http://localhost:8000`) via the thin `dash_ui/api.py` client. This decouples the dashboard process from the engine and lets the two scale independently.
+
+#### 5.2.1 Architecture
+
+```
+Browser ──► Dash app (:8050)
+              │ dash.page_container, dcc.Store (session/local), dcc.Interval
+              │ Bootstrap DARKLY theme + custom CSS (dash_ui/theme.py)
+              ▼
+            dash_ui/api.py  (requests, timeouts: 10 s short / 60 s long)
+              ▼
+          FastAPI (:8000)  → PredictionTradingSystem, AutoTrader, ETFAnalyzer, ...
+```
+
+**Top-level layout (`app.py`):**
+- `dcc.Store(scan-results-store)`, `predict-result-store`, `app-config-store` (session storage), `theme-store` (local), `current-theme-store` (memory) — the only cross-page state.
+- `dcc.Interval(config-load-interval)` fires once on startup to call `GET /config/` and `GET /trading/status`, which populates a global status bar with API-online/offline indicator.
+- A `dbc.Navbar` with a brand link, page links rendered from `dash.page_registry` sorted by `order`, and a 3-button theme toggle (auto / dark / light).
+- A clientside callback (pure JavaScript, no Python round-trip) sets `data-bs-theme` on `<html>` and writes the resolved theme back to `current-theme-store`. Charts that need to recolor on theme change subscribe to `current-theme-store` and pass the resolved layout to `theme.get_plotly_layout(theme_name)`.
+
+**Theme module (`dash_ui/theme.py`):** Exposes the shared color palette, two Plotly layout dicts (`PLOTLY_DARK_LAYOUT`, `PLOTLY_LIGHT_LAYOUT`), and a `CUSTOM_CSS` string that defines CSS variables for `[data-bs-theme="dark"]` / `[data-bs-theme="light"]` and `@media (prefers-color-scheme: light)` for the auto mode.
+
+**API client (`dash_ui/api.py`):** Thin wrapper over `requests` with `_SHORT=10s` (status/health/config) and `_LONG=60s` (predict/scan/backtest/macro/portfolio) timeouts. One function per backend endpoint: `predict`, `scan`, `backtest`, `trading_status`, `trading_start`, `predict_macro`, `portfolio_analyze`, `get_config`, `put_config`, `health_check`.
+
+#### 5.2.2 Cross-page state contract
+
+Three keys live on the top-level layout and persist via Dash storage:
+
+| Store ID | Storage | Written by | Read by |
+|---|---|---|---|
+| `scan-results-store` | `session` | `pages/scanner.py` after a successful `/scan/` | `pages/analytics.py` for histogram/pie/factor charts |
+| `predict-result-store` | `session` | `pages/predict.py` after a successful `/predict/` (also stores `result["macro"]`) | `pages/analytics.py` adds the single prediction into the analytics dataset |
+| `app-config-store` | `session` | startup callback, refreshed by Settings save | global status bar, future config-aware widgets |
+| `theme-store` | `local` | theme-toggle clientside callback | persists across sessions (localStorage) |
+| `current-theme-store` | `memory` | clientside callback (resolves auto → dark/light) | every page that renders a Plotly figure |
+
+Per-page stores: `bt-store` (Backtest, session), `equity-history-store` (Dashboard, memory, last 360 polls), `alerts-store` (Alerts, **local**), `trade-ui-state` (Trading, session).
+
+#### 5.2.3 Page inventory
+
+| Page | Module | Path | Order | Responsibility |
+|---|---|---|---|---|
+| Dashboard | `pages/home.py` | `/` | 0 | Live KPIs, equity curve, positions/trades/risk tabs. Polls `/trading/status` every 10 s via `dcc.Interval`. |
+| Predict | `pages/predict.py` | `/predict` | 1 | Single-ticker prediction. Calls `/predict/` then `/predict/macro`. Renders Signal / Factors / Analysis / Fundamentals / Market / AI Narrative tabs. |
+| Scanner | `pages/scanner.py` | `/scanner` | 2 | Bulk scan via `/scan/`. Optional 30 s auto-refresh, CSV export via `dcc.Download`. |
+| Trading | `pages/trading.py` | `/trading` | 3 | Start AutoTrader via `/trading/start`. Polls `/trading/status` every 10 s for KPIs, positions, last cycle actions. Stop is **not** wired to an API endpoint — only resets the UI; physical stop requires an API restart. |
+| Analytics | `pages/analytics.py` | `/analytics` | 4 | Visualises `scan-results-store` + `predict-result-store`. Five tabs: confidence histogram, direction pie, factor frequency (top 20), category heatmap, ticker scatter. Theme-reactive. |
+| Backtest | `pages/backtest.py` | `/backtest` | 5 | Calls `/backtest/`. Equity curve / candlestick + trades / trade log tabs. |
+| Alerts | `pages/alerts.py` | `/alerts` | 6 | Active / Create / Triggered tabs. Persisted to `localStorage` (no backend). "Check Now" calls `yfinance.Ticker(t).fast_info.last_price` directly from the Dash process — the only place the Dash UI imports a non-HTTP data source. |
+| Portfolio Builder | `pages/portfolio.py` | `/portfolio` | 7 | Calls `/portfolio/analyze`. ETF/Stock cards, diversification score, correlation heatmap, sector exposure bar, recommendations. |
+| Settings | `pages/settings.py` | `/settings` | 8 | Calls `GET /config/` on load (one-shot interval), `PUT /config/` on Save. Accordion UI for portfolio / risk / signals / indicator categories / AI / auto-trader / data source / broker sections. |
+
+#### 5.2.4 Components module (`dash_ui/components.py`)
+
+Public functions (~660 LOC) used across pages:
+
+| Helper | Purpose |
+|---|---|
+| `status_bar(config_data, api_online)` | Top-of-page status row showing API health, model, data source, broker. |
+| `kpi_card(title, value, delta, delta_positive)` | Reusable KPI tile (used on Dashboard, Trading, Backtest, Predict). |
+| `direction_badge(direction)` | Pill badge ("BUY" / "SELL" / "HOLD") tinted by `theme.DIRECTION_COLORS`. |
+| `factor_bar_chart(factors, ...)` | Horizontal Plotly bar of signed factor points. |
+| `confidence_gauge(direction, confidence, ...)` | Plotly indicator gauge in `direction` color. |
+| `equity_line_chart(equity_points, ...)` | Equity curve line chart with optional initial-capital reference line. |
+| `candlestick_chart(ohlcv, ...)` | OHLCV candlestick + volume sub-panel (Plotly subplots). |
+| `analysis_chart(ohlcv, indicators, levels, timing=...)` | Multi-row analysis chart: price + MAs + Bollinger + entry/stop/target lines, MACD, RSI, Stochastic, ATR, Volume, OBV. ~260 LOC. |
+| `fundamentals_chart(fundamentals, ticker, ...)` | Grid of fundamental metric cards (P/E, PEG, ROE, D/E, etc.). |
+| `index_performance_chart(indexes, ...)` | Horizontal bar of 1D/5D/30D returns for major market indexes. |
+| `scan_results_table(results)` | `dash_table.DataTable` for scanner output with conditional row coloring. |
+
+#### 5.2.5 Live polling model
+
+Dash uses `dcc.Interval` rather than threads (the Streamlit pattern in §5.1.3):
+
+```
+Dashboard:   dcc.Interval(10 s) → callback → api.trading_status() → KPIs, equity history, positions/trades/risk
+Trading:     dcc.Interval(10 s) → callback → api.trading_status() → banner, KPIs, positions, last cycle
+Scanner:     dcc.Interval(30 s, disabled by default) → callback → api.scan() (only when auto-refresh switch is on)
+Analytics:   dcc.Interval(30 s) → callback → re-renders charts from stores (no network call)
+```
+
+Equity history on the Dashboard is accumulated client-side in `equity-history-store` (capped at 360 points = 1 hour at 10 s polling) — the API does not yet return a live equity curve.
+
+#### 5.2.6 Differences from the Streamlit UI
+
+| Concern | Streamlit (§5.1) | Dash (§5.2) |
+|---|---|---|
+| Backend coupling | Direct Python imports | HTTP only (REST API) |
+| Default port | 8501 | 8050 |
+| State store | `st.session_state` (server) | `dcc.Store` (browser session/local) |
+| Live updates | `st.rerun()` after `time.sleep()` in main thread; AutoTrader runs in a daemon thread inside the Streamlit process | `dcc.Interval` callbacks; AutoTrader runs inside the FastAPI process |
+| Theme | Light/dark CSS injection via `inject_theme(dark)` | CSS variables + `data-bs-theme` attribute, switched by clientside callback |
+| Watchlist sidebar | Persistent `ui/watchlist.py` rendered on every page | Not present — quick-links and watchlist live inside the Scanner textarea |
+| Stop AutoTrader | Sets a session flag the daemon thread polls each cycle | No live stop — UI button only resets the dashboard view; physical stop requires API restart |
+| Production deploy | `streamlit run` only | Exposes `server` (Flask WSGI) for gunicorn / uvicorn-workers |
+| News / macro / sector category controls | Hidden in Predict and Scanner; shown only in Settings | Shown in all three pages (Predict, Scanner, Settings) |
 
 ---
 
