@@ -123,9 +123,11 @@ def _empty_kpi_row():
 @callback(
     Output("dash-equity-chart", "figure"),
     Input("equity-history-store", "data"),
+    Input("current-theme-store", "data"),
 )
-def _update_equity_chart(history: list) -> object:
-    return components.equity_line_chart(history or [], height=300)
+def _update_equity_chart(history: list, current_theme: str) -> object:
+    layout = theme.get_plotly_layout(current_theme or "dark")
+    return components.equity_line_chart(history or [], height=300, plotly_layout=layout)
 
 
 def _build_detail_tab(active_tab: str, status: dict) -> html.Div:

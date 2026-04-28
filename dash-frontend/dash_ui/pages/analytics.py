@@ -110,33 +110,37 @@ def _get_filtered(scan_results, predict_result, min_conf, dir_filter):
     Input("analytics-interval", "n_intervals"),
     Input("analytics-min-conf", "value"),
     Input("analytics-dir-filter", "value"),
+    Input("current-theme-store", "data"),
     State("scan-results-store", "data"),
     State("predict-result-store", "data"),
 )
-def _update_charts(n, min_conf, dir_filter, scan_results, predict_result):
+def _update_charts(n, min_conf, dir_filter, current_theme, scan_results, predict_result):
     items = _get_filtered(scan_results, predict_result, min_conf or 0.0, dir_filter)
+    layout = theme.get_plotly_layout(current_theme or "dark")
 
     return (
-        _confidence_histogram(items),
-        _direction_pie(items),
-        _factor_frequency(items),
-        _category_heatmap(items),
-        _ticker_scatter(items),
+        _confidence_histogram(items, layout),
+        _direction_pie(items, layout),
+        _factor_frequency(items, layout),
+        _category_heatmap(items, layout),
+        _ticker_scatter(items, layout),
     )
 
 
-def _empty_fig(msg: str) -> go.Figure:
+def _empty_fig(msg: str, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     fig = go.Figure()
     fig.update_layout(
-        **theme.PLOTLY_DARK_LAYOUT,
+        **base,
         annotations=[dict(text=msg, x=0.5, y=0.5, showarrow=False, font=dict(color=theme.MUTED, size=14))],
     )
     return fig
 
 
-def _confidence_histogram(items: list) -> go.Figure:
+def _confidence_histogram(items: list, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not items:
-        return _empty_fig("No data. Run a scan or prediction first.")
+        return _empty_fig("No data. Run a scan or prediction first.", base)
 
     traces = []
     for direction, label, color in [
@@ -153,11 +157,11 @@ def _confidence_histogram(items: list) -> go.Figure:
             ))
 
     fig = go.Figure(traces)
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base)
     layout.update(
         title="Confidence Distribution by Direction",
-        xaxis=dict(**theme.PLOTLY_DARK_LAYOUT["xaxis"], title="Confidence Score", range=[0, 1]),
-        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], title="Count"),
+        xaxis=dict(**base["xaxis"], title="Confidence Score", range=[0, 1]),
+        yaxis=dict(**base["yaxis"], title="Count"),
         barmode="overlay",
         height=380,
     )
@@ -165,9 +169,10 @@ def _confidence_histogram(items: list) -> go.Figure:
     return fig
 
 
-def _direction_pie(items: list) -> go.Figure:
+def _direction_pie(items: list, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not items:
-        return _empty_fig("No data. Run a scan or prediction first.")
+        return _empty_fig("No data. Run a scan or prediction first.", base)
 
     counts = Counter(r.get("direction", "neutral") for r in items)
     labels = ["BUY", "SELL", "HOLD"]
@@ -180,7 +185,7 @@ def _direction_pie(items: list) -> go.Figure:
         hole=0.4,
         hovertemplate="%{label}: %{value} (%{percent})<extra></extra>",
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base)
     layout.update(title="Signal Direction Breakdown", height=380)
     fig.update_layout(**layout)
     return fig
@@ -189,9 +194,10 @@ def _direction_pie(items: list) -> go.Figure:
 _BULLISH_KEYWORDS = {"above", "oversold", "golden", "bullish", "rising", "beat", "strong", "positive", "low", "breakout", "buy"}
 
 
-def _factor_frequency(items: list) -> go.Figure:
+def _factor_frequency(items: list, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not items:
-        return _empty_fig("No data. Run a scan or prediction first.")
+        return _empty_fig("No data. Run a scan or prediction first.", base)
 
     counter: Counter = Counter()
     for r in items:
@@ -200,7 +206,7 @@ def _factor_frequency(items: list) -> go.Figure:
                 counter[name] += 1
 
     if not counter:
-        return _empty_fig("No factor data available.")
+        return _empty_fig("No factor data available.", base)
 
     top = counter.most_common(20)
     names = [t[0] for t in top]
@@ -215,11 +221,11 @@ def _factor_frequency(items: list) -> go.Figure:
         marker_color=colors,
         hovertemplate="%{y}: %{x} occurrences<extra></extra>",
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base)
     layout.update(
         title="Top 20 Most Frequent Factors",
-        xaxis=dict(**theme.PLOTLY_DARK_LAYOUT["xaxis"], title="Occurrences"),
-        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], autorange="reversed"),
+        xaxis=dict(**base["xaxis"], title="Occurrences"),
+        yaxis=dict(**base["yaxis"], autorange="reversed"),
         height=max(380, len(names) * 22 + 80),
     )
     fig.update_layout(**layout)
@@ -229,10 +235,14 @@ def _factor_frequency(items: list) -> go.Figure:
 _CATEGORIES = ["trend", "momentum", "volatility", "volume", "support", "fundamental", "news", "macro", "sector"]
 
 
-def _category_heatmap(items: list) -> go.Figure:
+def _category_heatmap(items: list, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     detailed = [r for r in items if r.get("factors")]
     if not detailed:
-        return _empty_fig("Category heatmap requires full factor data.\nIndividual predictions (Predict page) include this.\nScan factors shown here if backend returns them.")
+        return _empty_fig(
+            "Category heatmap requires full factor data.\nIndividual predictions (Predict page) include this.\nScan factors shown here if backend returns them.",
+            base,
+        )
 
     tickers = [r["ticker"] for r in detailed]
     matrix = []
@@ -247,24 +257,29 @@ def _category_heatmap(items: list) -> go.Figure:
             row.append(net)
         matrix.append(row)
 
+    is_light = base.get("template") == "plotly_white"
+    heatmap_mid = "#e9ecef" if is_light else "#21262d"
+    text_color = "#212529" if is_light else theme.TEXT
+
     fig = go.Figure(go.Heatmap(
         z=matrix,
         x=tickers,
         y=_CATEGORIES,
-        colorscale=[[0, theme.RED], [0.5, "#21262d"], [1, theme.GREEN]],
+        colorscale=[[0, theme.RED], [0.5, heatmap_mid], [1, theme.GREEN]],
         zmid=0,
         hovertemplate="Ticker: %{x}<br>Category: %{y}<br>Net Points: %{z}<extra></extra>",
-        colorbar=dict(title="Net Points", tickfont=dict(color=theme.TEXT)),
+        colorbar=dict(title="Net Points", tickfont=dict(color=text_color)),
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base)
     layout.update(title="Signal Category Heatmap (Net Points)", height=420)
     fig.update_layout(**layout)
     return fig
 
 
-def _ticker_scatter(items: list) -> go.Figure:
+def _ticker_scatter(items: list, plotly_layout: dict | None = None) -> go.Figure:
+    base = plotly_layout if plotly_layout is not None else theme.PLOTLY_DARK_LAYOUT
     if not items:
-        return _empty_fig("No data. Run a scan or prediction first.")
+        return _empty_fig("No data. Run a scan or prediction first.", base)
 
     tickers = [r.get("ticker", "") for r in items]
     confidences = [r.get("confidence", 0.0) for r in items]
@@ -281,10 +296,10 @@ def _ticker_scatter(items: list) -> go.Figure:
         marker=dict(color=colors, size=sizes, line=dict(color=theme.BORDER, width=1)),
         hovertemplate="%{x}: %{y:.1%} confidence<extra></extra>",
     ))
-    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout = dict(base)
     layout.update(
         title="Ticker Confidence Overview",
-        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], title="Confidence", range=[0, 1.1], tickformat=".0%"),
+        yaxis=dict(**base["yaxis"], title="Confidence", range=[0, 1.1], tickformat=".0%"),
         height=380,
     )
     fig.update_layout(**layout)
