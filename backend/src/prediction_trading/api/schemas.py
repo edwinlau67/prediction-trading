@@ -74,6 +74,9 @@ class PredictResponse(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict)
     timing: TimingResponse | None = None
     ohlcv: list[dict[str, Any]] = Field(default_factory=list)
+    indicators: dict[str, Any] | None = None
+    levels: dict[str, Any] | None = None
+    fundamentals: dict[str, Any] | None = None
 
 
 class ScanResultResponse(BaseModel):

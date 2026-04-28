@@ -182,6 +182,385 @@ def candlestick_chart(
     return fig
 
 
+def analysis_chart(
+    ohlcv: list[dict],
+    indicators: dict,
+    levels: dict,
+    timing: dict | None = None,
+    height: int = 1200,
+) -> go.Figure:
+    from plotly.subplots import make_subplots
+
+    if not ohlcv:
+        fig = go.Figure()
+        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=height)
+        return fig
+
+    dates = [r["date"] for r in ohlcv]
+    opens = [r["open"] for r in ohlcv]
+    highs = [r["high"] for r in ohlcv]
+    lows = [r["low"] for r in ohlcv]
+    closes = [r["close"] for r in ohlcv]
+    vols = [r.get("volume", 0) for r in ohlcv]
+
+    fig = make_subplots(
+        rows=7, cols=1,
+        shared_xaxes=True,
+        row_heights=[3, 1, 1.5, 1, 1, 1, 1],
+        vertical_spacing=0.012,
+        subplot_titles=("", "Volume", "MACD", "RSI", "Stochastic", "OBV", "ATR"),
+    )
+
+    # ── Row 1: Candlestick ─────────────────────────────────────────────────────
+    fig.add_trace(go.Candlestick(
+        x=dates, open=opens, high=highs, low=lows, close=closes,
+        increasing_line_color=theme.GREEN, decreasing_line_color=theme.RED,
+        name="OHLC", showlegend=False,
+    ), row=1, col=1)
+
+    # Bollinger Bands (fill between upper/lower)
+    bb_upper = indicators.get("bb_upper", [])
+    bb_lower = indicators.get("bb_lower", [])
+    bb_mid = indicators.get("bb_mid", [])
+    if any(v is not None for v in bb_upper):
+        fig.add_trace(go.Scatter(
+            x=dates, y=bb_upper,
+            line=dict(color="rgba(88,166,255,0.35)", width=1),
+            name="BB Upper", showlegend=False, hoverinfo="skip",
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=bb_lower,
+            line=dict(color="rgba(88,166,255,0.35)", width=1),
+            fill="tonexty", fillcolor="rgba(88,166,255,0.06)",
+            name="BB Lower", showlegend=False, hoverinfo="skip",
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=bb_mid,
+            line=dict(color="rgba(88,166,255,0.5)", width=1, dash="dot"),
+            name="BB Mid", showlegend=False, hoverinfo="skip",
+        ), row=1, col=1)
+
+    # Moving averages
+    for key, label, color, width in [
+        ("sma20", "SMA20", theme.YELLOW, 1),
+        ("sma50", "SMA50", theme.PURPLE, 1.2),
+        ("sma200", "SMA200", theme.RED, 1.5),
+        ("ema20", "EMA20", "#ff9f40", 1),
+    ]:
+        vals = indicators.get(key, [])
+        if any(v is not None for v in vals):
+            fig.add_trace(go.Scatter(
+                x=dates, y=vals, line=dict(color=color, width=width),
+                name=label, showlegend=False,
+                hovertemplate=f"{label}: %{{y:.2f}}<extra></extra>",
+            ), row=1, col=1)
+
+    # Fibonacci levels
+    _fib_colors = [
+        ("0.0%",   "rgba(255,100,100,0.55)"),
+        ("23.6%",  "rgba(255,165,0,0.55)"),
+        ("38.2%",  "rgba(240,200,40,0.55)"),
+        ("50.0%",  "rgba(150,150,255,0.55)"),
+        ("61.8%",  "rgba(40,200,100,0.55)"),
+        ("78.6%",  "rgba(100,200,255,0.55)"),
+        ("100.0%", "rgba(100,255,200,0.55)"),
+    ]
+    if levels.get("fibonacci"):
+        fib_lvls = levels["fibonacci"].get("levels", {})
+        color_map = dict(_fib_colors)
+        for lvl_name, lvl_price in fib_lvls.items():
+            c = color_map.get(lvl_name, "rgba(200,200,200,0.3)")
+            fig.add_hline(
+                y=lvl_price, line_dash="dash", line_color=c, line_width=1,
+                annotation_text=f"Fib {lvl_name}",
+                annotation_font_size=9,
+                annotation_position="right",
+                row=1, col=1,
+            )
+
+    # Pivot levels
+    if levels.get("pivots"):
+        pvt = levels["pivots"]
+        for name, val, color in [
+            ("PP", pvt.get("pp"), theme.MUTED),
+            ("R1", pvt.get("r1"), "#4dff88"),
+            ("R2", pvt.get("r2"), "#26d96a"),
+            ("S1", pvt.get("s1"), "#ff9999"),
+            ("S2", pvt.get("s2"), theme.RED),
+        ]:
+            if val:
+                fig.add_hline(
+                    y=val, line_dash="dot", line_color=color, line_width=1,
+                    annotation_text=name, annotation_font_size=9,
+                    annotation_position="left",
+                    row=1, col=1,
+                )
+
+    # Entry / stop / take-profit
+    if timing:
+        for level, label, color, dash in [
+            (timing.get("entry_price"), "Entry", theme.BLUE, "dash"),
+            (timing.get("stop_loss"),   "Stop",  theme.RED,  "dot"),
+            (timing.get("take_profit"), "Target", theme.GREEN, "dot"),
+        ]:
+            if level:
+                fig.add_hline(
+                    y=level, line_dash=dash, line_color=color, line_width=2,
+                    annotation_text=f"{label}: ${level:.2f}",
+                    annotation_font_size=10,
+                    annotation_position="right",
+                    row=1, col=1,
+                )
+
+    # ── Row 2: Volume ─────────────────────────────────────────────────────────
+    vol_colors = [theme.GREEN if c >= o else theme.RED for c, o in zip(closes, opens)]
+    fig.add_trace(go.Bar(
+        x=dates, y=vols, marker_color=vol_colors, name="Volume",
+        opacity=0.7, showlegend=False,
+        hovertemplate="Vol: %{y:,.0f}<extra></extra>",
+    ), row=2, col=1)
+    # Volume spikes
+    spikes = indicators.get("volume_spike", [])
+    if spikes:
+        sdates = [d for d, s in zip(dates, spikes) if s]
+        svols  = [v for v, s in zip(vols,  spikes) if s]
+        if sdates:
+            fig.add_trace(go.Scatter(
+                x=sdates, y=svols, mode="markers",
+                marker=dict(color=theme.YELLOW, size=9, symbol="star"),
+                name="Spike", showlegend=False,
+                hovertemplate="Spike: %{y:,.0f}<extra></extra>",
+            ), row=2, col=1)
+
+    # ── Row 3: MACD ───────────────────────────────────────────────────────────
+    macd      = indicators.get("macd", [])
+    macd_sig  = indicators.get("macd_signal", [])
+    macd_hist = indicators.get("macd_hist", [])
+    if any(v is not None for v in macd):
+        hist_colors = [theme.GREEN if (v or 0) >= 0 else theme.RED for v in macd_hist]
+        fig.add_trace(go.Bar(
+            x=dates, y=macd_hist, marker_color=hist_colors, name="Hist",
+            opacity=0.7, showlegend=False,
+            hovertemplate="Hist: %{y:.4f}<extra></extra>",
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=macd, line=dict(color=theme.BLUE, width=1.5),
+            name="MACD", showlegend=False,
+            hovertemplate="MACD: %{y:.4f}<extra></extra>",
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=macd_sig, line=dict(color=theme.YELLOW, width=1.5),
+            name="Signal", showlegend=False,
+            hovertemplate="Signal: %{y:.4f}<extra></extra>",
+        ), row=3, col=1)
+        fig.add_hline(y=0, line_color=theme.MUTED, line_width=0.5, row=3, col=1)
+
+    # ── Row 4: RSI ────────────────────────────────────────────────────────────
+    rsi = indicators.get("rsi", [])
+    if any(v is not None for v in rsi):
+        fig.add_hrect(y0=70, y1=100, fillcolor="rgba(255,100,100,0.08)", line_width=0, row=4, col=1)
+        fig.add_hrect(y0=0,  y1=30,  fillcolor="rgba(38,217,106,0.08)",  line_width=0, row=4, col=1)
+        fig.add_hline(y=70, line_color=theme.RED,   line_width=0.7, line_dash="dash", row=4, col=1)
+        fig.add_hline(y=30, line_color=theme.GREEN, line_width=0.7, line_dash="dash", row=4, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=rsi, line=dict(color=theme.BLUE, width=1.5),
+            name="RSI", showlegend=False,
+            hovertemplate="RSI: %{y:.1f}<extra></extra>",
+        ), row=4, col=1)
+
+    # ── Row 5: Stochastic ─────────────────────────────────────────────────────
+    stoch_k = indicators.get("stoch_k", [])
+    stoch_d = indicators.get("stoch_d", [])
+    if any(v is not None for v in stoch_k):
+        fig.add_hrect(y0=80, y1=100, fillcolor="rgba(255,100,100,0.08)", line_width=0, row=5, col=1)
+        fig.add_hrect(y0=0,  y1=20,  fillcolor="rgba(38,217,106,0.08)",  line_width=0, row=5, col=1)
+        fig.add_hline(y=80, line_color=theme.RED,   line_width=0.7, line_dash="dash", row=5, col=1)
+        fig.add_hline(y=20, line_color=theme.GREEN, line_width=0.7, line_dash="dash", row=5, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=stoch_k, line=dict(color=theme.BLUE, width=1.5),
+            name="%K", showlegend=False,
+            hovertemplate="%%K: %{y:.1f}<extra></extra>",
+        ), row=5, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=stoch_d, line=dict(color=theme.YELLOW, width=1.5),
+            name="%D", showlegend=False,
+            hovertemplate="%%D: %{y:.1f}<extra></extra>",
+        ), row=5, col=1)
+
+    # ── Row 6: OBV ────────────────────────────────────────────────────────────
+    obv = indicators.get("obv", [])
+    if any(v is not None for v in obv):
+        valid = [v for v in obv if v is not None]
+        obv_color = theme.GREEN if valid[-1] >= valid[0] else theme.RED
+        fig.add_trace(go.Scatter(
+            x=dates, y=obv, line=dict(color=obv_color, width=1.5),
+            name="OBV", showlegend=False,
+            hovertemplate="OBV: %{y:,.0f}<extra></extra>",
+        ), row=6, col=1)
+
+    # ── Row 7: ATR ────────────────────────────────────────────────────────────
+    atr = indicators.get("atr", [])
+    if any(v is not None for v in atr):
+        valid_atr = [v for v in atr if v is not None]
+        atr_mean = sum(valid_atr) / len(valid_atr) if valid_atr else None
+        fig.add_trace(go.Scatter(
+            x=dates, y=atr, line=dict(color=theme.PURPLE, width=1.5),
+            name="ATR", showlegend=False,
+            hovertemplate="ATR: %{y:.4f}<extra></extra>",
+        ), row=7, col=1)
+        if atr_mean:
+            fig.add_hline(
+                y=atr_mean, line_color=theme.MUTED, line_dash="dash", line_width=0.7,
+                row=7, col=1,
+            )
+
+    # ── Layout ────────────────────────────────────────────────────────────────
+    base = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT.items() if k not in ("xaxis", "yaxis")}
+    base.update(
+        height=height,
+        hovermode="x unified",
+        showlegend=False,
+        margin=dict(l=60, r=90, t=30, b=40),
+    )
+    fig.update_layout(**base)
+    fig.update_layout(xaxis_rangeslider_visible=False)
+    # Global axis styles
+    ax_x = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT["xaxis"].items() if k != "rangeslider"}
+    fig.update_xaxes(**ax_x)
+    fig.update_yaxes(**theme.PLOTLY_DARK_LAYOUT["yaxis"])
+    # Per-row y-axis
+    fig.update_yaxes(tickprefix="$", row=1, col=1)
+    fig.update_yaxes(range=[0, 100], fixedrange=True, row=4, col=1)
+    fig.update_yaxes(range=[0, 100], fixedrange=True, row=5, col=1)
+    # Subplot title font
+    for ann in fig.layout.annotations:
+        ann.font.size = 10
+        ann.font.color = theme.MUTED
+    return fig
+
+
+def fundamentals_chart(fundamentals: dict, ticker: str = "") -> go.Figure:
+    from plotly.subplots import make_subplots
+
+    if not fundamentals:
+        fig = go.Figure()
+        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=380,
+                          title="No fundamental data available")
+        return fig
+
+    val_items = [
+        ("P/E (TTM)",   fundamentals.get("trailingPE"),                   25, 40),
+        ("P/E (Fwd)",   fundamentals.get("forwardPE"),                     20, 35),
+        ("P/B",         fundamentals.get("priceToBook"),                    3,  6),
+        ("P/S",         fundamentals.get("priceToSalesTrailing12Months"),   5, 10),
+        ("EV/EBITDA",   fundamentals.get("enterpriseToEbitda"),            15, 25),
+        ("PEG",         fundamentals.get("pegRatio"),                       1.5, 3),
+        ("D/E",         fundamentals.get("debtToEquity"),                   1,  2),
+        ("Short Ratio", fundamentals.get("shortRatio"),                     3,  6),
+    ]
+    qual_items = [
+        ("Rev Growth %",  fundamentals.get("revenueGrowth")),
+        ("EPS Growth %",  fundamentals.get("earningsGrowth")),
+        ("Profit Margin", fundamentals.get("profitMargins")),
+        ("Op. Margin",    fundamentals.get("operatingMargins")),
+        ("ROE",           fundamentals.get("returnOnEquity")),
+        ("Curr Ratio",    fundamentals.get("currentRatio")),
+        ("Div Yield",     fundamentals.get("dividendYield")),
+    ]
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=("Valuation Ratios", "Quality Metrics"),
+        horizontal_spacing=0.12,
+    )
+
+    val_labels, val_values, val_colors = [], [], []
+    for label, val, fair, exp in val_items:
+        if val is None:
+            continue
+        val_labels.append(label)
+        val_values.append(round(val, 2))
+        val_colors.append(
+            theme.GREEN if val <= fair else (theme.YELLOW if val <= exp else theme.RED)
+        )
+
+    if val_labels:
+        fig.add_trace(go.Bar(
+            x=val_values, y=val_labels, orientation="h",
+            marker_color=val_colors, showlegend=False,
+            hovertemplate="%{y}: %{x:.2f}<extra></extra>",
+        ), row=1, col=1)
+
+    qual_labels, qual_values, qual_colors = [], [], []
+    for label, val in qual_items:
+        if val is None:
+            continue
+        pct = round(val * 100, 2)
+        qual_labels.append(label)
+        qual_values.append(pct)
+        qual_colors.append(theme.GREEN if pct >= 0 else theme.RED)
+
+    if qual_labels:
+        fig.add_trace(go.Bar(
+            x=qual_values, y=qual_labels, orientation="h",
+            marker_color=qual_colors, showlegend=False,
+            hovertemplate="%{y}: %{x:.2f}%<extra></extra>",
+        ), row=1, col=2)
+
+    base = {k: v for k, v in theme.PLOTLY_DARK_LAYOUT.items() if k not in ("xaxis", "yaxis")}
+    base.update(height=380, title=f"{ticker} Fundamentals" if ticker else "Fundamentals")
+    fig.update_layout(**base)
+    fig.update_xaxes(**theme.PLOTLY_DARK_LAYOUT["xaxis"])
+    fig.update_yaxes(**theme.PLOTLY_DARK_LAYOUT["yaxis"])
+    fig.update_xaxes(title_text="Ratio", row=1, col=1)
+    fig.update_xaxes(title_text="%", row=1, col=2)
+    for ann in fig.layout.annotations:
+        ann.font.size = 11
+        ann.font.color = theme.MUTED
+    return fig
+
+
+def index_performance_chart(indexes: list[dict]) -> go.Figure:
+    if not indexes:
+        fig = go.Figure()
+        fig.update_layout(**theme.PLOTLY_DARK_LAYOUT, height=320,
+                          title="No market data available")
+        return fig
+
+    _colors = {
+        "SPY": theme.BLUE, "^GSPC": theme.BLUE,
+        "QQQ": theme.PURPLE, "^IXIC": theme.PURPLE,
+        "DIA": theme.YELLOW, "^DJI": theme.YELLOW,
+        "^VIX": theme.RED, "VIX": theme.RED,
+        "IWM": "#ff9f40", "^RUT": "#ff9f40",
+    }
+    periods = ["1D %", "5D %", "30D %"]
+    period_keys = ["change_1d_pct", "change_5d_pct", "change_30d_pct"]
+
+    fig = go.Figure()
+    for idx in indexes:
+        sym = idx.get("symbol", "")
+        name = idx.get("name") or sym
+        color = _colors.get(sym, theme.MUTED)
+        values = [idx.get(k) for k in period_keys]
+        fig.add_trace(go.Bar(
+            name=name, x=periods, y=values,
+            marker_color=color,
+            hovertemplate=f"<b>{name}</b><br>%{{x}}: %{{y:+.2f}}%<extra></extra>",
+        ))
+
+    layout = dict(theme.PLOTLY_DARK_LAYOUT)
+    layout.update(
+        height=350,
+        title="Index Performance",
+        barmode="group",
+        yaxis=dict(**theme.PLOTLY_DARK_LAYOUT["yaxis"], title="% Change", ticksuffix="%"),
+    )
+    fig.update_layout(**layout)
+    fig.add_hline(y=0, line_color=theme.MUTED, line_width=0.6)
+    return fig
+
+
 def scan_results_table(results: list[dict]) -> dash_table.DataTable:
     rows = []
     for r in results:

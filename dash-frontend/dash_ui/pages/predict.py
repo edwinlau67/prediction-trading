@@ -177,8 +177,12 @@ def _build_results(result: dict) -> object:
     if timing:
         signal_content.append(_build_timing_card(timing))
 
-    # Market Index Overview table
+    indicators = result.get("indicators") or {}
+    levels = result.get("levels") or {}
+    fundamentals = result.get("fundamentals") or {}
     indexes = macro.get("indexes", [])
+
+    # Market Index Overview table (Signal tab)
     if indexes:
         signal_content.append(_build_index_table(indexes))
 
@@ -192,6 +196,39 @@ def _build_results(result: dict) -> object:
         dbc.Tab(factors_tab, label=f"Factors ({len(factors)})", tab_id="fac"),
     ]
 
+    if ohlcv:
+        entry = timing.get("entry_price") if timing else None
+        stop_loss = timing.get("stop_loss") if timing else None
+        tp = timing.get("take_profit") if timing else None
+        timing_for_chart = {"entry_price": entry, "stop_loss": stop_loss, "take_profit": tp} if timing else None
+        analysis_fig = components.analysis_chart(ohlcv, indicators, levels, timing=timing_for_chart)
+        tabs.append(dbc.Tab(
+            dcc.Graph(
+                figure=analysis_fig,
+                config={"displayModeBar": True, "scrollZoom": True, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+                style={"height": "1200px"},
+            ),
+            label="Analysis", tab_id="analysis",
+        ))
+
+    if fundamentals:
+        tabs.append(dbc.Tab(
+            dcc.Graph(
+                figure=components.fundamentals_chart(fundamentals, ticker),
+                config={"displayModeBar": False},
+            ),
+            label="Fundamentals", tab_id="fund",
+        ))
+
+    if indexes:
+        tabs.append(dbc.Tab(
+            dcc.Graph(
+                figure=components.index_performance_chart(indexes),
+                config={"displayModeBar": False},
+            ),
+            label="Market", tab_id="market",
+        ))
+
     if narrative:
         tabs.append(dbc.Tab(
             dbc.Card(dbc.CardBody(html.Pre(
@@ -199,16 +236,6 @@ def _build_results(result: dict) -> object:
                 style={"color": theme.TEXT, "fontSize": "13px", "whiteSpace": "pre-wrap", "margin": 0},
             ))),
             label="AI Narrative", tab_id="ai",
-        ))
-
-    if ohlcv:
-        entry = timing.get("entry_price") if timing else None
-        stop = timing.get("stop_loss") if timing else None
-        tp = timing.get("take_profit") if timing else None
-        candle_fig = components.candlestick_chart(ohlcv, height=420, entry=entry, stop=stop, target=tp)
-        tabs.append(dbc.Tab(
-            dcc.Graph(figure=candle_fig, config={"displayModeBar": False}),
-            label="Candlestick", tab_id="candle",
         ))
 
     return dbc.Tabs(tabs, active_tab="sig", className="mt-2")

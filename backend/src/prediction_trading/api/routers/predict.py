@@ -59,6 +59,57 @@ def predict(req: PredictRequest) -> PredictResponse:
                     "volume": float(row.get("Volume", 0)),
                 })
 
+        indicators = None
+        levels = None
+        try:
+            import pandas as pd
+            from prediction_trading.indicators.technical import TechnicalIndicators
+            from prediction_trading.indicators.levels import SupportResistance
+
+            raw_df = system._market.ohlcv if system._market else None
+            if raw_df is not None and not raw_df.empty:
+                ind_df = TechnicalIndicators.compute_all(raw_df)
+                ind_slice = ind_df.tail(120)
+
+                def _vlist(series: "pd.Series") -> list:
+                    return [None if pd.isna(v) else round(float(v), 6) for v in series]
+
+                indicators = {
+                    "macd": _vlist(ind_slice["MACD"]),
+                    "macd_signal": _vlist(ind_slice["MACD_signal"]),
+                    "macd_hist": _vlist(ind_slice["MACD_hist"]),
+                    "rsi": _vlist(ind_slice["RSI"]),
+                    "stoch_k": _vlist(ind_slice["Stoch_K"]),
+                    "stoch_d": _vlist(ind_slice["Stoch_D"]),
+                    "obv": _vlist(ind_slice["OBV"]),
+                    "atr": _vlist(ind_slice["ATR"]),
+                    "sma20": _vlist(ind_slice["SMA20"]),
+                    "sma50": _vlist(ind_slice["SMA50"]),
+                    "sma200": _vlist(ind_slice["SMA200"]),
+                    "ema20": _vlist(ind_slice["EMA20"]),
+                    "bb_upper": _vlist(ind_slice["BB_upper"]),
+                    "bb_mid": _vlist(ind_slice["BB_mid"]),
+                    "bb_lower": _vlist(ind_slice["BB_lower"]),
+                    "volume_spike": [bool(v) for v in ind_slice["VolumeSpike"]],
+                }
+
+                last = raw_df.iloc[-1]
+                pivots = SupportResistance.pivot_points(
+                    float(last["High"]), float(last["Low"]), float(last["Close"])
+                )
+                fib = SupportResistance.fibonacci(raw_df)
+                levels = {
+                    "fibonacci": {"high": fib.high, "low": fib.low, "levels": fib.levels},
+                    "pivots": {
+                        "pp": pivots.pp, "r1": pivots.r1, "r2": pivots.r2,
+                        "s1": pivots.s1, "s2": pivots.s2,
+                    },
+                }
+        except Exception:
+            pass
+
+        fundamentals = (system._market.fundamentals or None) if system._market else None
+
         return PredictResponse(
             ticker=prediction.ticker,
             direction=prediction.direction,
@@ -71,6 +122,9 @@ def predict(req: PredictRequest) -> PredictResponse:
             meta=getattr(prediction, "meta", {}),
             timing=timing,
             ohlcv=ohlcv,
+            indicators=indicators,
+            levels=levels,
+            fundamentals=fundamentals,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
