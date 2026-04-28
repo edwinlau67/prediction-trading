@@ -72,7 +72,7 @@ Dash UI is a REST client — start `make api-dev` first. Navbar has an **Auto / 
 | Portfolio Builder | `/portfolio` | Holdings cards; Diversification Score; Correlation Heatmap; Sector Exposure |
 | Settings | `/settings` | 8 accordion sections; GET/PUT `/config/` API |
 
-Full Dash page reference: [`docs/DASH_UI_GUIDE.md`](DASH_UI_GUIDE.md)
+Full Dash page reference: [`docs/TRADING_SYSTEM_GUIDE.md#dash-ui`](TRADING_SYSTEM_GUIDE.md#dash-ui)
 
 ---
 

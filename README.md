@@ -159,7 +159,7 @@ Real-time dashboard using Plotly Dash + Bootstrap. Connects to the FastAPI backe
 | **Portfolio Builder** | `/portfolio` | Holdings cards (ETF/Stock badge); Diversification Score; Correlation Heatmap; Sector Exposure bar chart; recommendations. |
 | **Settings** | `/settings` | 8 accordion sections; loads from `GET /config/`, saves via `PUT /config/`. |
 
-For the full Dash UI walkthrough see [`docs/DASH_UI_GUIDE.md`](docs/DASH_UI_GUIDE.md). For the full Streamlit walkthrough see [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md).
+For the full per-page walkthroughs of both UIs see [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) — [Streamlit UI](docs/TRADING_SYSTEM_GUIDE.md#streamlit-ui) and [Dash UI](docs/TRADING_SYSTEM_GUIDE.md#dash-ui).
 
 ---
 
@@ -465,8 +465,7 @@ All 115 tests across 14 files use synthetic OHLCV fixtures (`backend/tests/conft
 
 | Document | Contents |
 |----------|----------|
-| [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough including Streamlit UI per-page reference |
-| [`docs/DASH_UI_GUIDE.md`](docs/DASH_UI_GUIDE.md) | Dash UI per-page reference (all 9 pages) |
+| [`docs/TRADING_SYSTEM_GUIDE.md`](docs/TRADING_SYSTEM_GUIDE.md) | Full end-to-end walkthrough including Streamlit and Dash UI page references |
 | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Python and REST API reference |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture deep-dive |
 | [`docs/EXAMPLES.md`](docs/EXAMPLES.md) | Annotated code examples |
