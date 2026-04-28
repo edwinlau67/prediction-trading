@@ -362,6 +362,11 @@ make api-dev   # start FastAPI (Terminal 1)
 make dash-dev  # start Dash on :8050 (Terminal 2)
 ```
 
+**Global UI features**
+
+- **Theme switcher** in the navbar: **Auto / Dark / Light** (Auto follows OS `prefers-color-scheme`). Selection persists in `localStorage`; every Plotly chart re-renders on switch via the `current-theme-store`.
+- **Config status bar** between the navbar and page content shows the live backend config — Data source · interval · AI model (or "Rule-based") · Broker (Paper / Alpaca, with live/dry-run dot). Loads once on app start; falls back to a red "API Offline" badge if the API is unreachable.
+
 For the full per-page reference see [`docs/DASH_UI_GUIDE.md`](DASH_UI_GUIDE.md). Page summary:
 
 ### Page Reference
@@ -374,7 +379,20 @@ Live trading monitor. Polls `/trading/status` every 10 s via `dcc.Interval`. KPI
 
 #### 2. Predict (`/predict`)
 
-Inputs: Ticker · Timeframe · Enable AI toggle · **Claude Model selector** (per-run, unlike Streamlit which sets the model in Settings) · 4H Confluence toggle · Indicator Categories multiselect (all 9 available). Result tabs: **Signal** (direction badge, confidence gauge, Timing Recommendation card, Market Index table), **Factors** (bar chart top 15), **AI Narrative**, **Candlestick**. Result saved to `predict-result-store` for Analytics.
+Inputs: Ticker · Timeframe · Enable AI toggle · **Claude Model selector** (per-run, unlike Streamlit which sets the model in Settings) · 4H Confluence toggle · Indicator Categories multiselect (all 9 available).
+
+Result tabs (rendered conditionally):
+
+| Tab | Always shown? | Contents |
+|---|---|---|
+| **Signal** | yes | Direction badge · confidence gauge · current price / target / risk · Timing Recommendation card · Market Index Overview table |
+| **Factors (N)** | yes | Horizontal bar chart of top 15 factors (label includes total count) |
+| **Analysis** | when OHLCV returned | Multi-panel chart: candlestick + EMA/SMA · entry/stop/target lines · support/resistance · volume · MACD · RSI · Stochastic (1200 px, scroll-zoom enabled) |
+| **Fundamentals** | when fundamentals returned | Two-panel valuation (P/E, P/B, P/S, EV/EBITDA, …) and growth/margin bars |
+| **Market** | when macro indexes returned | Grouped bar chart of VIX / SPY / QQQ / DXY across 1D · 5D · 30D % changes |
+| **AI Narrative** | when AI enabled and text returned | Raw Claude narrative in monospace |
+
+Result saved to `predict-result-store` for the Analytics page.
 
 ---
 

@@ -58,12 +58,12 @@ uv run pytest backend/tests/test_signal_scorer.py -v
 
 ## Dash UI Pages (`make api-dev` + `make dash-dev` → `:8050`)
 
-Dash UI is a REST client — start `make api-dev` first. Dark theme only.
+Dash UI is a REST client — start `make api-dev` first. Navbar has an **Auto / Dark / Light** theme switcher; a global config status bar (Data · Feed · Model · Broker) sits between the navbar and page content.
 
 | Page | Route | Primary Action |
 |---|---|---|
 | Dashboard | `/` | 10 s live polling — equity KPIs, equity curve (360 pts), positions/trades/risk tabs |
-| Predict | `/predict` | Prediction with per-run model selector; Signal/Factors/AI Narrative/Candlestick tabs |
+| Predict | `/predict` | Prediction with per-run model selector; tabs: Signal · Factors · Analysis (multi-panel) · Fundamentals · Market · AI Narrative |
 | Scanner | `/scanner` | Watchlist scan; auto-refresh (30 s); results stored cross-page in `scan-results-store` |
 | **Analytics** | `/analytics` | **Dash-only** — confidence histogram, direction donut, factor frequency, category heatmap, ticker scatter |
 | Trading | `/trading` | Start AutoTrader via API; last-cycle actions table (OPEN/CLOSE/ERROR); 10 s polling |

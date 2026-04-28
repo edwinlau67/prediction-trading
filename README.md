@@ -39,7 +39,7 @@
 - **Alpaca broker integration** for live/paper trading via `AlpacaBroker`
 - **Watchlist scanner** for parallel bulk signal scoring (no API key required)
 - **FastAPI REST API** with OpenAPI docs at `/docs`
-- **Two web UIs:** Streamlit (`frontend/`, 8 pages, self-contained) and Dash (`dash-frontend/`, 9 pages, connects to REST API) — both with live trading dashboard and dark theme
+- **Two web UIs:** Streamlit (`frontend/`, 8 pages, self-contained) and Dash (`dash-frontend/`, 9 pages, connects to REST API) — both with live trading dashboards; Streamlit offers a Dark/Light header toggle, Dash offers Auto/Dark/Light theme switching with a global config status bar
 
 ---
 
@@ -145,12 +145,12 @@ make dash-dev   # or: uv run python dash-frontend/app.py
 # opens http://localhost:8050
 ```
 
-Real-time dashboard using Plotly Dash + Bootstrap (dark theme). Connects to the FastAPI backend at `localhost:8000` via `dash_ui/api.py`. Features `dcc.Interval` polling (no page reloads), `dcc.Store` cross-page state sharing, and a dedicated **Analytics** page absent from the Streamlit UI.
+Real-time dashboard using Plotly Dash + Bootstrap. Connects to the FastAPI backend at `localhost:8000` via `dash_ui/api.py`. Features `dcc.Interval` polling (no page reloads), `dcc.Store` cross-page state sharing, an **Auto / Dark / Light** theme switcher in the navbar (clientside, no round-trip), a global config status bar (Data · Feed · Model · Broker), and a dedicated **Analytics** page absent from the Streamlit UI.
 
 | Page | Route | Key Features |
 |---|---|---|
 | **Dashboard** | `/` | Live 10 s polling of `/trading/status`; KPI row; equity curve (up to 360 points); tabs: Open Positions, Recent Trades, Risk KPIs. |
-| **Predict** | `/predict` | Per-run Claude model selector; tabs: Signal (gauge + timing + index table), Factors bar chart, AI Narrative, Candlestick chart. Result stored in `predict-result-store`. |
+| **Predict** | `/predict` | Per-run Claude model selector; tabs: **Signal** (gauge + timing + index table), **Factors (N)** bar chart, **Analysis** (multi-panel candlestick + EMAs + MACD + RSI + Stochastic + volume), **Fundamentals** (valuation + growth bars), **Market** (1D/5D/30D index bars), **AI Narrative**. Result stored in `predict-result-store`. |
 | **Scanner** | `/scanner` | Watchlist scan with auto-refresh toggle (30 s); CSV export; results stored in `scan-results-store`. |
 | **Analytics** | `/analytics` | **Dash-only.** Visualizes data from Scanner + Predict stores: Confidence Distribution histogram, Direction donut, Factor Frequency bar, Category Heatmap (9 categories × tickers), Ticker Confidence scatter. |
 | **Trading** | `/trading` | Start form with cycle-interval slider (60–3600 s); running view: status banner, positions table, last-cycle actions (OPEN/CLOSE/ERROR color-coded). |

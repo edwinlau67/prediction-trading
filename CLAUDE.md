@@ -103,11 +103,13 @@ dash_ui/                        ← Dash pages + components + api client
 ### Dash UI conventions
 
 - All pages are auto-registered via `dash.register_page(__name__, path=..., order=...)` in `dash_ui/pages/`.
-- All HTTP calls go through `dash_ui/api.py` (base URL `http://localhost:8000`; 10 s / 60 s timeouts).
-- Reusable chart factories live in `dash_ui/components.py`; color palette and `PLOTLY_DARK_LAYOUT` in `dash_ui/theme.py`.
-- Cross-page state uses `dcc.Store`: `scan-results-store` and `predict-result-store` are session-scoped globals (defined in `app.py`); `alerts-store` is localStorage-scoped (persists across sessions).
+- All HTTP calls go through `dash_ui/api.py` (base URL `http://localhost:8000`; 10 s / 60 s timeouts). `get_config()` is called once on app startup to populate the global status bar.
+- Reusable chart factories live in `dash_ui/components.py`. Every chart factory accepts an optional `plotly_layout=` kwarg so callbacks can pass the theme-resolved layout from `current-theme-store`. The `status_bar(config_data, api_online)` factory renders the global config bar mounted in `app.py`.
+- Theme handling lives in `dash_ui/theme.py`: color constants, `PLOTLY_DARK_LAYOUT`, `PLOTLY_LIGHT_LAYOUT`, the `get_plotly_layout(theme_name)` selector, and `CUSTOM_CSS` (with CSS variables under `[data-bs-theme="dark"|"light"]` and a `prefers-color-scheme: light` media query).
+- Theme switching is a clientside callback in `app.py` driven by three navbar buttons (Auto / Dark / Light). Selection persists in `theme-store` (localStorage); the resolved value lives in `current-theme-store` (memory) and is read by every chart-rendering callback.
+- Cross-page state uses `dcc.Store`. Globals defined in `app.py`: `scan-results-store` (session), `predict-result-store` (session), `app-config-store` (session), `theme-store` (localStorage), `current-theme-store` (memory). Page-scoped: `alerts-store` (localStorage, persists across sessions), `equity-history-store` (memory), `bt-store` (session).
 - Live polling uses `dcc.Interval` components — Dashboard and Trading pages poll `/trading/status` every 10 s.
-- All 9 categories are available in the Predict page multiselect (unlike Streamlit which limits to 6 in the UI).
+- All 9 categories are available in the Predict page multiselect (unlike Streamlit which limits to 6 in the UI). The Predict result view conditionally adds **Analysis**, **Fundamentals**, **Market**, and **AI Narrative** tabs based on what the API returns; **Signal** and **Factors** are always shown.
 
 ### Prediction pipeline
 

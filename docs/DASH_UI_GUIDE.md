@@ -11,8 +11,9 @@ The Dash UI (`dash-frontend/`) is a real-time trading dashboard built with [Plot
 | Backend dependency | Self-contained (calls Python directly) | Requires `make api-dev` running on `:8000` |
 | Pages | 8 | 9 (adds **Analytics**) |
 | Live polling | Meta-refresh (page reload) | Dash `dcc.Interval` callbacks (no full reload) |
-| Theme | Light or dark (toggle in header) | Dark only |
-| State persistence | `st.session_state` (session) | `dcc.Store` (session/localStorage) |
+| Theme | Light or dark (toggle in header) | **Auto / Dark / Light** (toggle in navbar; Auto follows OS preference) |
+| Global status bar | Per-page `config_info_bar()` component | Single global bar between navbar and page content |
+| State persistence | `st.session_state` (session) | `dcc.Store` (session / localStorage / memory) |
 | AI model selector | Settings page | Per-prediction on Predict page |
 | Launch command | `make ui-dev` | `make dash-dev` |
 
@@ -38,7 +39,28 @@ Without the API running, all pages will show "API unavailable" errors.
 
 ## Navigation & Layout
 
-**Navbar** — A top navigation bar lists all nine pages (sorted by order). On mobile, the nav collapses to a hamburger menu.
+**Navbar** — A top navigation bar lists all nine pages (sorted by `order=`). On mobile, the nav collapses to a hamburger menu.
+
+**Theme switcher** — A three-button group on the right side of the navbar:
+
+| Button | Icon | Behaviour |
+|---|---|---|
+| **Auto** | half-circle | Follow `prefers-color-scheme` from the OS (default) |
+| **Dark** | moon | Force dark theme (`data-bs-theme="dark"`) |
+| **Light** | sun | Force light theme (`data-bs-theme="light"`) |
+
+The selection persists in `localStorage` (`theme-store`). All Plotly charts re-render when the theme changes — every chart factory in `dash_ui/components.py` accepts an optional `plotly_layout=` kwarg, and pages pass `theme.get_plotly_layout(current_theme)` from the `current-theme-store`. CSS variables (`--theme-bg`, `--theme-card-bg`, `--theme-text`, …) defined in `dash_ui/theme.py:CUSTOM_CSS` keep cards, inputs, tables, and form controls in sync.
+
+**Global status bar** — A compact bar between the navbar and the page content shows the active backend configuration (loaded once on app start via `GET /config/`):
+
+| Field | Source | Badge color |
+|---|---|---|
+| **Data** | `data.source` | blue (`yfinance` / `alpaca` / `both`) |
+| **Feed** | `data.interval` | cyan (`1d` / `1h` / `1m` / …) |
+| **Model** | `ai.enabled` ? `ai.model` : `Rule-based` | green when AI enabled, grey otherwise |
+| **Broker** | `broker.type` / `paper_trading` | grey for `Paper`, amber for `Alpaca`; bullet dot is green when **not** in dry-run, grey when dry-run |
+
+If the API is unreachable on startup, the bar collapses to a red **API Offline** badge and pages show their own per-callback error states.
 
 **Color conventions** throughout the UI:
 
@@ -55,17 +77,24 @@ Without the API running, all pages will show "API unavailable" errors.
 
 ## Cross-Page State (dcc.Store)
 
-Some stores are global (defined in `app.py`) and shared across pages:
+Stores defined in `app.py` are global and shared across pages; page-scoped stores are declared inside the page layout:
 
-| Store ID | Scope | Written by | Read by | Contents |
-|---|---|---|---|---|
-| `scan-results-store` | session | Scanner | Analytics | Full scan result list |
-| `predict-result-store` | session | Predict | Analytics | Last prediction result |
-| `alerts-store` | localStorage | Alerts | Alerts | `{"active": [...], "triggered": [...]}` |
-| `equity-history-store` | memory | Dashboard | Dashboard | List of `{t, equity}` snapshots |
-| `bt-store` | session | Backtest | Backtest | Backtest result metadata |
+| Store ID | Scope | Defined in | Written by | Read by | Contents |
+|---|---|---|---|---|---|
+| `scan-results-store` | session | `app.py` | Scanner | Analytics | Full scan result list |
+| `predict-result-store` | session | `app.py` | Predict | Analytics | Last prediction result |
+| `app-config-store` | session | `app.py` | startup callback | (status bar) | Config dict from `GET /config/` |
+| `theme-store` | localStorage | `app.py` | navbar buttons | clientside callback | Theme preference: `"auto"` / `"dark"` / `"light"` |
+| `current-theme-store` | memory | `app.py` | clientside callback | every chart-rendering callback | Resolved theme: `"dark"` or `"light"` |
+| `alerts-store` | localStorage | `pages/alerts.py` | Alerts | Alerts | `{"active": [...], "triggered": [...]}` |
+| `equity-history-store` | memory | `pages/home.py` | Dashboard | Dashboard | List of `{ts, equity}` snapshots |
+| `bt-store` | session | `pages/backtest.py` | Backtest | Backtest | Backtest result metadata |
 
-`localStorage` stores survive browser refresh; `session` stores clear on tab close; `memory` stores clear on page reload.
+Scope semantics:
+
+- **`localStorage`** — survives browser refresh, tab close, and machine reboot.
+- **`session`** — clears when the browser tab is closed.
+- **`memory`** — clears on every page reload (in-memory only).
 
 ---
 
@@ -117,14 +146,16 @@ The Dashboard is read-only — use the **Trading** page to start or stop the Aut
 
 Click **Run Prediction**. Results are stored in `predict-result-store` for use by the Analytics page.
 
-**Result tabs:**
+**Result tabs** (rendered conditionally based on what the API returns):
 
-| Tab | Contents |
-|---|---|
-| **Signal** | Direction badge (BUY/SELL/HOLD) · Confidence % · Current Price · Price Target (with % change) · Risk Level · Confidence gauge · Timing Recommendation card · Market Index table |
-| **Factors** | Horizontal bar chart of top 15 factors by point score (green = bullish, red = bearish) |
-| **AI Narrative** | Raw Claude narrative in monospace (only shown when AI is enabled and returned text) |
-| **Candlestick** | Interactive OHLCV chart with entry/stop/target lines and volume sub-panel |
+| Tab | Always shown? | Contents |
+|---|---|---|
+| **Signal** | yes | Ticker · direction badge · confidence % · current price · price target with % change · risk level · confidence gauge · Timing Recommendation card · Market Index Overview table |
+| **Factors (N)** | yes | Horizontal bar chart of top 15 factors by point score (green = bullish, red = bearish); tab label includes the total factor count |
+| **Analysis** | when `ohlcv` returned | Multi-panel `analysis_chart`: candlestick with EMA/SMA overlays · entry/stop/target lines · support/resistance levels · volume bars · MACD · RSI · Stochastic. Fully zoom/pan-enabled (`scrollZoom: true`); 1200 px tall |
+| **Fundamentals** | when `fundamentals` present | `fundamentals_chart` — two-panel bar chart: valuation ratios (P/E, P/B, P/S, EV/EBITDA, …) and growth/margin metrics (revenue growth, profit margin, ROE, …) |
+| **Market** | when macro indexes present | `index_performance_chart` — grouped bar chart of VIX / SPY / QQQ / DXY across 1D · 5D · 30D % changes |
+| **AI Narrative** | when AI enabled and text returned | Raw Claude narrative in monospace (`<pre>`) |
 
 **Timing Recommendation card** (when available):
 
@@ -337,8 +368,27 @@ Click **Analyze Portfolio**. Calls `POST /portfolio/analyze`.
 
 ## Architecture Notes
 
-- **Entry point:** `dash-frontend/app.py` — creates the `Dash` app with `use_pages=True` (auto-registers pages from `dash_ui/pages/`), injects `theme.CUSTOM_CSS`, mounts global `dcc.Store` components, and exposes `server` for gunicorn.
-- **API client:** `dash_ui/api.py` — all HTTP calls go through typed helper functions (10 s timeout for fast calls, 60 s for predict/scan/backtest).
-- **Components:** `dash_ui/components.py` — factory functions for all reusable Plotly charts and Bootstrap cards (`kpi_card`, `direction_badge`, `factor_bar_chart`, `confidence_gauge`, `equity_line_chart`, `candlestick_chart`, `scan_results_table`).
-- **Theme:** `dash_ui/theme.py` — color palette constants and `PLOTLY_DARK_LAYOUT` dict applied to every chart.
-- **Pages:** Each file in `dash_ui/pages/` exports `layout` (a Dash layout tree) and registers callbacks. Pages declare `dash.register_page(__name__, path=..., name=..., order=...)`.
+- **Entry point:** `dash-frontend/app.py` — creates the `Dash` app with `use_pages=True` (auto-registers pages from `dash_ui/pages/`), injects `theme.CUSTOM_CSS`, mounts the global `dcc.Store` components, registers the **clientside theme-toggle callback**, loads the backend config once via a one-shot `dcc.Interval`, and exposes `server` for gunicorn.
+- **API client:** `dash_ui/api.py` — all HTTP calls go through typed helper functions (10 s timeout for fast calls, 60 s for predict/scan/backtest). Includes `get_config()`, `predict()`, `predict_macro()`, `scan()`, `backtest()`, `trading_status()`, `trading_start()`, `portfolio_analyze()`.
+- **Components:** `dash_ui/components.py` — factory functions for all reusable Plotly charts and Bootstrap cards. Every chart factory accepts an optional `plotly_layout=` kwarg so callbacks can pass a theme-aware layout from `current-theme-store`:
+
+  | Function | Purpose |
+  |---|---|
+  | `status_bar(config_data, api_online)` | Global config-summary bar mounted in `app.py` |
+  | `kpi_card(title, value, delta=, delta_positive=)` | Bootstrap card with label / value / optional colored delta |
+  | `direction_badge(direction)` | Pill-shaped BUY/SELL/HOLD label |
+  | `factor_bar_chart(factors, height=, plotly_layout=)` | Horizontal bar of top-N factors |
+  | `confidence_gauge(direction, confidence, height=, plotly_layout=)` | Plotly indicator gauge |
+  | `equity_line_chart(equity_points, height=, initial_capital=, plotly_layout=)` | Equity area chart with capital baseline |
+  | `candlestick_chart(ohlcv, height=, entry=, stop=, target=, plotly_layout=)` | Compact OHLC + volume + level lines |
+  | `analysis_chart(ohlcv, indicators, levels, timing=, height=, plotly_layout=)` | Full multi-panel technical chart (Predict tab) |
+  | `fundamentals_chart(fundamentals, ticker=, plotly_layout=)` | Two-panel valuation / growth bars |
+  | `index_performance_chart(indexes, plotly_layout=)` | Grouped 1D / 5D / 30D macro index bars |
+  | `scan_results_table(results)` | Sortable scan results `DataTable` |
+
+- **Theme:** `dash_ui/theme.py`
+  - Color constants: `BG`, `CARD_BG`, `BORDER`, `GREEN`, `RED`, `BLUE`, `YELLOW`, `PURPLE`, `MUTED`, `TEXT`, plus `DIRECTION_COLORS` / `DIRECTION_LABELS` / `DIRECTION_BADGE_BG`.
+  - `PLOTLY_DARK_LAYOUT` and `PLOTLY_LIGHT_LAYOUT` dicts applied to every chart.
+  - `get_plotly_layout(theme_name: str)` selects the appropriate layout — pages call this with `current-theme-store` data.
+  - `CUSTOM_CSS` defines CSS variables under `[data-bs-theme="dark"]` / `[data-bs-theme="light"]` and a `prefers-color-scheme: light` media query so Bootstrap, DataTables, dropdowns, inputs, and cards all switch colors instantly.
+- **Pages:** Each file in `dash_ui/pages/` exports `layout` and registers callbacks. Pages declare `dash.register_page(__name__, path=..., name=..., order=...)`. Chart callbacks take `Input("current-theme-store", "data")` so every figure re-renders on theme change.
