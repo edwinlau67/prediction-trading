@@ -13,8 +13,11 @@ from typing import Any
 
 import pandas as pd
 
+import logging
+
 try:
     import yfinance as yf
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 except ImportError:  # pragma: no cover - import-time guard only
     yf = None  # type: ignore[assignment]
 
