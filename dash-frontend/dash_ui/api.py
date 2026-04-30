@@ -37,6 +37,7 @@ def predict(
     categories: list[str] | None = None,
     lookback_days: int = 365,
     use_4h: bool = False,
+    save_report: bool = False,
 ) -> dict:
     return _post(
         "/predict/",
@@ -47,6 +48,7 @@ def predict(
             "categories": categories,
             "lookback_days": lookback_days,
             "use_4h": use_4h,
+            "save_report": save_report,
         },
         timeout=_LONG,
     )

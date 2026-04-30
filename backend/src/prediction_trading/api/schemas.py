@@ -17,6 +17,7 @@ class PredictRequest(BaseModel):
     lookback_days: int = 365
     categories: list[str] | None = None
     use_4h: bool = False
+    save_report: bool = False
 
 
 class ScanRequest(BaseModel):
@@ -77,6 +78,7 @@ class PredictResponse(BaseModel):
     indicators: dict[str, Any] | None = None
     levels: dict[str, Any] | None = None
     fundamentals: dict[str, Any] | None = None
+    report_path: str | None = None
 
 
 class ScanResultResponse(BaseModel):

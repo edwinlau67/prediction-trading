@@ -110,6 +110,40 @@ def predict(req: PredictRequest) -> PredictResponse:
 
         fundamentals = (system._market.fundamentals or None) if system._market else None
 
+        report_path: str | None = None
+        if req.save_report:
+            try:
+                from prediction_trading.reporting import (
+                    PredictionChart,
+                    PredictionReportEntry,
+                    PredictionReportWriter,
+                )
+
+                writer = PredictionReportWriter(out_root="results")
+                run_dir = writer.new_run_dir()
+                chart_path = run_dir / "charts" / f"{prediction.ticker}_{req.timeframe}.png"
+                cats_tuple = tuple(req.categories) if req.categories else None
+                rendered = PredictionChart().render(
+                    prediction, system._market.ohlcv,
+                    categories=cats_tuple,
+                    timeframe=req.timeframe,
+                    out_path=chart_path,
+                    macro_context=getattr(system._market, "macro_context", None),
+                )
+                ai_sig = getattr(prediction, "ai_signal", None)
+                model = getattr(ai_sig, "model", None) if ai_sig else None
+                writer.write(
+                    run_dir,
+                    [PredictionReportEntry(
+                        prediction=prediction, timeframe=req.timeframe,
+                        chart_path=rendered, ohlcv=system._market.ohlcv,
+                    )],
+                    model=model, categories=cats_tuple,
+                )
+                report_path = str(run_dir)
+            except Exception:  # don't fail the prediction if save fails
+                report_path = None
+
         return PredictResponse(
             ticker=prediction.ticker,
             direction=prediction.direction,
@@ -125,6 +159,7 @@ def predict(req: PredictRequest) -> PredictResponse:
             indicators=indicators,
             levels=levels,
             fundamentals=fundamentals,
+            report_path=report_path,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

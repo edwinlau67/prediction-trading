@@ -58,10 +58,15 @@ layout = dbc.Container(
                     dbc.Switch(id="pred-4h-toggle", value=False, label="Enable 4H"),
                 ], md=1),
                 dbc.Col([
+                    dbc.Label("Save Report", style={"color": theme.MUTED, "fontSize": "12px"}),
+                    html.Br(),
+                    dbc.Switch(id="pred-save-report", value=False, label="results/"),
+                ], md=1),
+                dbc.Col([
                     dbc.Label("Run", style={"color": theme.MUTED, "fontSize": "12px"}),
                     html.Br(),
                     dbc.Button("Run Prediction", id="pred-run-btn", color="success", n_clicks=0),
-                ], md=2),
+                ], md=1),
             ], className="g-3"),
             dbc.Row([
                 dbc.Col([
@@ -76,6 +81,8 @@ layout = dbc.Container(
         ]), className="mb-4"),
 
         html.Div(id="pred-error"),
+        html.Div(id="pred-save-status"),
+        html.Div(id="pred-summary-save-status"),
         dcc.Loading(id="pred-loading", type="default", children=html.Div(id="pred-results")),
     ],
     fluid=True,
@@ -87,6 +94,7 @@ layout = dbc.Container(
     Output("predict-result-store", "data"),
     Output("pred-error", "children"),
     Output("pred-results", "children"),
+    Output("pred-save-status", "children"),
     Input("pred-run-btn", "n_clicks"),
     State("pred-ticker", "value"),
     State("pred-timeframe", "value"),
@@ -94,18 +102,22 @@ layout = dbc.Container(
     State("pred-4h-toggle", "value"),
     State("pred-categories", "value"),
     State("pred-ai-model", "value"),
+    State("pred-save-report", "value"),
     prevent_initial_call=True,
 )
-def _run_prediction(n_clicks, ticker, timeframe, enable_ai, use_4h, categories, ai_model):
+def _run_prediction(n_clicks, ticker, timeframe, enable_ai, use_4h, categories, ai_model, save_report):
     if not ticker:
-        return no_update, dbc.Alert("Please enter a ticker symbol.", color="warning"), no_update
+        return no_update, dbc.Alert("Please enter a ticker symbol.", color="warning"), no_update, no_update
 
     ticker = ticker.strip().upper()
     try:
-        result = api.predict(ticker, timeframe, enable_ai, categories or None, use_4h=use_4h)
+        result = api.predict(
+            ticker, timeframe, enable_ai, categories or None,
+            use_4h=use_4h, save_report=bool(save_report),
+        )
     except Exception as exc:
         err = dbc.Alert([html.Strong("Prediction failed: "), str(exc)], color="danger")
-        return no_update, err, no_update
+        return no_update, err, no_update, no_update
 
     # Fetch macro context for market index table (non-blocking)
     try:
@@ -115,7 +127,60 @@ def _run_prediction(n_clicks, ticker, timeframe, enable_ai, use_4h, categories, 
         result["macro"] = {}
 
     results_ui = _build_results(result)
-    return result, None, results_ui
+
+    save_status: object = None
+    report_path = result.get("report_path")
+    if save_report and report_path:
+        save_status = dbc.Alert(
+            [html.Strong("Report saved: "), html.Code(report_path)],
+            color="success", dismissable=True, className="mt-2 mb-2",
+        )
+    elif save_report and not report_path:
+        save_status = dbc.Alert(
+            "Save report was requested but the server could not write the file.",
+            color="warning", dismissable=True, className="mt-2 mb-2",
+        )
+
+    return result, None, results_ui, save_status
+
+
+@callback(
+    Output("pred-summary-save-status", "children"),
+    Input("pred-summary-save-btn", "n_clicks"),
+    State("predict-result-store", "data"),
+    State("pred-timeframe", "value"),
+    State("pred-ai-toggle", "value"),
+    State("pred-4h-toggle", "value"),
+    State("pred-categories", "value"),
+    prevent_initial_call=True,
+)
+def _save_summary(n_clicks, result, timeframe, enable_ai, use_4h, categories):
+    if not n_clicks or not result:
+        return no_update
+    ticker = result.get("ticker", "")
+    if not ticker:
+        return no_update
+    try:
+        resp = api.predict(
+            ticker, timeframe or "1w", bool(enable_ai),
+            categories or None, use_4h=bool(use_4h), save_report=True,
+        )
+    except Exception as exc:
+        return dbc.Alert(
+            [html.Strong("Could not save report: "), str(exc)],
+            color="danger", dismissable=True, className="mt-2 mb-2",
+        )
+    path = resp.get("report_path")
+    if not path:
+        return dbc.Alert(
+            "Server could not write the report.",
+            color="warning", dismissable=True, className="mt-2 mb-2",
+        )
+    return dbc.Alert(
+        [html.Strong("Report saved: "), html.Code(path),
+         html.Span(" (predictions.md + chart)", className="ms-2 text-muted")],
+        color="success", dismissable=True, className="mt-2 mb-2",
+    )
 
 
 def _build_results(result: dict) -> object:
@@ -191,8 +256,28 @@ def _build_results(result: dict) -> object:
         config={"displayModeBar": False},
     )
 
+    summary_md = _build_summary_markdown(result)
+    summary_tab = html.Div([
+        dcc.Loading(
+            dbc.Button(
+                "Save Report (with charts) to results/",
+                id="pred-summary-save-btn",
+                color="secondary", size="sm", className="mb-3",
+            ),
+            type="circle",
+        ),
+        dbc.Card(dbc.CardBody(
+            dcc.Markdown(
+                summary_md,
+                style={"color": theme.TEXT, "fontSize": "13px"},
+                link_target="_blank",
+            ),
+        )),
+    ], className="mt-3")
+
     tabs = [
         dbc.Tab(html.Div(signal_content), label="Signal", tab_id="sig"),
+        dbc.Tab(summary_tab, label="Summary", tab_id="summary"),
         dbc.Tab(factors_tab, label=f"Factors ({len(factors)})", tab_id="fac"),
     ]
 
@@ -322,3 +407,147 @@ def _build_index_table(indexes: list[dict]) -> html.Div:
             ],
         ),
     ], className="mt-3")
+
+
+def _build_summary_markdown(result: dict) -> str:
+    """Build a predictions.md-style markdown summary from the API result."""
+    ticker = result.get("ticker", "")
+    direction = (result.get("direction") or "neutral").upper()
+    confidence = result.get("confidence", 0.0) or 0.0
+    price = result.get("current_price") or 0.0
+    target = result.get("price_target")
+    target_date = result.get("target_date")
+    risk = (result.get("risk_level") or "medium").title()
+    factors = result.get("factors") or []
+    timing = result.get("timing") or {}
+    meta = result.get("meta") or {}
+    levels = result.get("levels") or {}
+    timeframe = meta.get("timeframe", "")
+    narrative = meta.get("ai_narrative") or meta.get("narrative")
+
+    bullish = sorted([f for f in factors if (f.get("points") or 0) > 0],
+                     key=lambda f: -(f.get("points") or 0))[:8]
+    bearish = sorted([f for f in factors if (f.get("points") or 0) < 0],
+                     key=lambda f: (f.get("points") or 0))[:8]
+
+    out: list[str] = []
+    title = f"{ticker} ({timeframe})" if timeframe else ticker
+    out.append(f"## {title}")
+    out.append("")
+    out.append("### Prediction Summary")
+    out.append("")
+    out.append("| Field | Value |")
+    out.append("| --- | --- |")
+    out.append(f"| Direction | **{direction}** |")
+    out.append(f"| Confidence | **{confidence * 100:.1f}%** |")
+    out.append(f"| Current Price | ${price:,.2f} |")
+    if target is not None and price:
+        chg = (target - price) / price * 100.0
+        out.append(f"| Price Target | ${target:,.2f} ({chg:+.2f}%) |")
+    if target_date:
+        out.append(f"| Target Date | {target_date} |")
+    out.append(f"| Risk Level | {risk} |")
+    net_points = sum((f.get("points") or 0) for f in factors)
+    if factors:
+        out.append(f"| Net score | {net_points:+d} pts across {len(factors)} factors |")
+    out.append("")
+
+    if bullish:
+        out.append("### Key Bullish Factors")
+        out.append("")
+        for i, f in enumerate(bullish, 1):
+            detail = f.get("detail") or f.get("category", "")
+            out.append(f"{i}. **{f.get('name', '')}** — {detail} _({(f.get('points') or 0):+d} pts)_")
+        out.append("")
+
+    if bearish:
+        out.append("### Key Risk Factors / Bearish Signals")
+        out.append("")
+        for i, f in enumerate(bearish, 1):
+            detail = f.get("detail") or f.get("category", "")
+            out.append(f"{i}. **{f.get('name', '')}** — {detail} _({(f.get('points') or 0):+d} pts)_")
+        out.append("")
+
+    pivots = levels.get("pivots") or {}
+    if pivots:
+        out.append("### Technical Levels to Watch")
+        out.append("")
+        out.append("| Level | Price |")
+        out.append("| --- | --- |")
+        for label, key in [("R2", "r2"), ("R1", "r1"), ("**PP**", "pp"), ("S1", "s1"), ("S2", "s2")]:
+            v = pivots.get(key)
+            if v is not None:
+                bold = "**" if label.startswith("**") else ""
+                out.append(f"| {label} | {bold}${v:,.2f}{bold} |")
+        out.append("")
+
+    fib = levels.get("fibonacci") or {}
+    fib_levels = fib.get("levels") or {}
+    if fib_levels:
+        out.append("### Fibonacci Retracement Levels")
+        out.append("")
+        lo, hi = fib.get("low"), fib.get("high")
+        if lo is not None and hi is not None:
+            out.append(f"_Range: ${lo:,.2f} → ${hi:,.2f}_")
+            out.append("")
+        out.append("| Level | Price |")
+        out.append("| --- | --- |")
+        for label, val in fib_levels.items():
+            out.append(f"| {label} | ${val:,.2f} |")
+        out.append("")
+
+    if timing:
+        out.append("### Timing Recommendation")
+        out.append("")
+        out.append(f"**Action:** `{timing.get('action', 'WAIT')}`")
+        out.append("")
+        if timing.get("reason"):
+            out.append(f"**Rationale:** {timing.get('reason')}")
+            out.append("")
+        rows: list[tuple[str, str]] = []
+        if timing.get("entry_price") is not None:
+            rows.append(("Entry Price", f"${timing['entry_price']:,.2f}"))
+        if timing.get("stop_loss") is not None:
+            rows.append(("Stop Loss", f"${timing['stop_loss']:,.2f}"))
+        if timing.get("take_profit") is not None:
+            rows.append(("Take Profit", f"${timing['take_profit']:,.2f}"))
+        rows.append(("Time Horizon", timing.get("time_horizon", "1w")))
+        out.append("| Field | Value |")
+        out.append("| --- | --- |")
+        for k, v in rows:
+            out.append(f"| {k} | {v} |")
+        out.append("")
+
+    out.append("### Analysis")
+    out.append("")
+    out.append(narrative if narrative else _default_narrative(result, bullish, bearish))
+    out.append("")
+
+    return "\n".join(out)
+
+
+def _default_narrative(result: dict, bullish: list[dict], bearish: list[dict]) -> str:
+    ticker = result.get("ticker", "")
+    direction = (result.get("direction") or "neutral").lower()
+    confidence = result.get("confidence", 0.0) or 0.0
+    price = result.get("current_price") or 0.0
+    target = result.get("price_target")
+    risk = (result.get("risk_level") or "medium").lower()
+    timeframe = (result.get("meta") or {}).get("timeframe", "window")
+
+    parts = [
+        f"The technical model projects a **{direction}** stance on {ticker} "
+        f"with {confidence * 100:.0f}% confidence over the coming {timeframe}."
+    ]
+    if bullish:
+        parts.append("Bullish support comes from " + ", ".join(f["name"] for f in bullish[:3]) + ".")
+    if bearish:
+        parts.append("Key risks include " + ", ".join(f["name"] for f in bearish[:3]) + ".")
+    if target is not None and price:
+        delta = (target - price) / price * 100.0
+        parts.append(
+            f"The projected price target is ${target:,.2f} ({delta:+.2f}% from current), "
+            f"assuming the scored signals continue to dominate; position sizing should respect "
+            f"the {risk} volatility regime."
+        )
+    return " ".join(parts)
