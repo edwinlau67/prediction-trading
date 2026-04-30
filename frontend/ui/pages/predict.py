@@ -165,12 +165,23 @@ def _run_prediction(
 
         prediction = system.predict(market, hourly_4h=df_4h)
 
-        tmp_dir = Path(tempfile.mkdtemp())
-        chart_path = tmp_dir / f"{ticker}_{timeframe}.png"
         chart = PredictionChart()
+        cats_tuple = tuple(categories) if categories else None
+
+        if save_report:
+            from prediction_trading.reporting import (
+                PredictionReportEntry, PredictionReportWriter,
+            )
+            writer = PredictionReportWriter(out_root="results")
+            run_dir = writer.new_run_dir()
+            chart_path = run_dir / "charts" / f"{ticker}_{timeframe}.png"
+        else:
+            tmp_dir = Path(tempfile.mkdtemp())
+            chart_path = tmp_dir / f"{ticker}_{timeframe}.png"
+
         rendered = chart.render(
             prediction, market.ohlcv,
-            categories=tuple(categories) if categories else None,
+            categories=cats_tuple,
             timeframe=timeframe,
             out_path=chart_path,
             macro_context=market.macro_context,
@@ -184,9 +195,14 @@ def _run_prediction(
         st.session_state[PREDICT_DATA_FEED] = getattr(market, "data_feed", "yfinance")
 
         if save_report:
-            system._market = market
-            out_dir = system.save_report(prediction=prediction)
-            st.success(f"Report saved: `{out_dir}`")
+            ai_sig = getattr(prediction, "ai_signal", None)
+            model = getattr(ai_sig, "model", None) if ai_sig else None
+            entries = [PredictionReportEntry(
+                prediction=prediction, timeframe=timeframe,
+                chart_path=rendered, ohlcv=market.ohlcv,
+            )]
+            writer.write(run_dir, entries, model=model, categories=cats_tuple)
+            st.success(f"Report saved: `{run_dir}`")
 
     except Exception as exc:
         st.error(f"Prediction failed: {exc}")

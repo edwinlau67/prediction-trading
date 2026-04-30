@@ -13,7 +13,7 @@ pieces they have in common:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -99,7 +99,7 @@ class BaseReportWriter:
         the timestamp (e.g. the ticker symbol for backtests). The
         ``charts/`` subdir is created eagerly.
         """
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         middle = "_".join(p for p in parts if p)
         name = f"{self.RUN_PREFIX}_{middle}_{stamp}" if middle \
             else f"{self.RUN_PREFIX}_{stamp}"
@@ -142,7 +142,9 @@ class BaseReportWriter:
 
     @staticmethod
     def stamp_iso() -> str:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        local = datetime.now().astimezone()
+        tz = local.strftime("%Z") or local.strftime("%z")
+        return local.strftime(f"%Y-%m-%d %H:%M:%S {tz}").rstrip()
 
     # ------------------------------------------------------- writing
     @staticmethod
